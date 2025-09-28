@@ -1,0 +1,379 @@
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  width: 300px;
+  margin: 10px;
+  background: #f8f9fa;
+}
+.section {
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.clipboard-word, .review-word {
+  font-size: 1.2em;
+  margin-bottom: 8px;
+  color: #333;
+}
+button {
+  margin: 4px 0;
+  width: 100%;
+  padding: 7px 0;
+  border: none;
+  border-radius: 4px;
+  background: #1976d2;
+  color: #fff;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+button:hover {
+  background: #1565c0;
+}
+.status {
+  color: #388e3c;
+  font-size: 0.95em;
+  margin-top: 4px;
+}
+.word-list {
+  margin-top: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 6px;
+}
+.word-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.word-item:last-child {
+  border-bottom: none;
+}
+.word-text {
+  flex: 1;
+  margin-right: 8px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+.word-text:hover {
+  background-color: #f5f5f5;
+}
+.delete-btn {
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 0.8em;
+  width: auto;
+  margin: 0;
+}
+.delete-btn:hover {
+  background: #b71c1c;
+}
+.edit-textarea-inline {
+  flex: 1;
+  padding: 2px 4px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  font-size: 0.9em;
+  outline: none;
+  background-color: #fff;
+  margin-right: 8px;
+  font-family: inherit;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
+  min-height: 20px;
+}
+.edit-textarea-inline:focus {
+  border-color: #1565c0;
+  box-shadow: 0 0 3px rgba(25, 118, 210, 0.3);
+}
+#import-area {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+#import-text {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.9em;
+  resize: vertical;
+}
+.import-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.import-buttons button {
+  flex: 1;
+  min-width: 70px;
+  padding: 4px 8px;
+  font-size: 0.85em;
+}
+
+/* 模式管理样式 */
+.mode-section {
+  margin-bottom: 12px;
+}
+
+.mode-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mode-label {
+  font-size: 0.9em;
+  color: #666;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+.mode-dropdown {
+  position: relative;
+  flex: 1;
+}
+
+.mode-switcher-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  color: #333;
+  transition: border-color 0.2s;
+}
+
+.mode-switcher-btn:hover {
+  border-color: #1976d2;
+}
+
+.dropdown-arrow {
+  font-size: 0.8em;
+  color: #666;
+  transition: transform 0.2s;
+}
+
+.mode-switcher-btn.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.mode-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 1000;
+  margin-top: 2px;
+}
+
+.mode-dropdown-content {
+  padding: 4px 0;
+}
+
+.add-mode-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #1976d2;
+  font-size: 0.9em;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.add-mode-item:hover {
+  background-color: #f5f5f5;
+}
+
+.mode-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mode-item:hover {
+  background-color: #f5f5f5;
+}
+
+.mode-item:last-child {
+  border-bottom: none;
+}
+
+.mode-item.active {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.mode-name {
+  flex: 1;
+  font-size: 0.9em;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.mode-action-btn {
+  width: auto;
+  padding: 2px 6px;
+  font-size: 0.7em;
+  margin: 0;
+  background: #666;
+  border-radius: 3px;
+}
+
+.mode-action-btn:hover {
+  background: #555;
+}
+
+.mode-action-btn.edit {
+  background: #1976d2;
+}
+
+.mode-action-btn.edit:hover {
+  background: #1565c0;
+}
+
+.mode-action-btn.delete {
+  background: #e53935;
+}
+
+.mode-action-btn.delete:hover {
+  background: #b71c1c;
+}
+
+/* 模式对话框样式 */
+.mode-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.mode-dialog-content {
+  background: #fff;
+  border-radius: 8px;
+  width: 280px;
+  max-width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.mode-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mode-dialog-header h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #333;
+}
+
+.close-btn {
+  width: auto;
+  padding: 4px 8px;
+  background: #666;
+  border-radius: 4px;
+  font-size: 1.2em;
+  line-height: 1;
+  margin: 0;
+}
+
+.close-btn:hover {
+  background: #555;
+}
+
+.mode-dialog-body {
+  padding: 20px;
+}
+
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9em;
+  box-sizing: border-box;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 3px rgba(25, 118, 210, 0.3);
+}
+
+.mode-dialog-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-dialog-buttons button {
+  flex: 1;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.9em;
+}
+
+.save-btn {
+  background: #1976d2;
+}
+
+.save-btn:hover {
+  background: #1565c0;
+}
+
+.cancel-btn {
+  background: #666;
+}
+
+.cancel-btn:hover {
+  background: #555;
+} 

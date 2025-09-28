@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "单词记录器",
+  "version": "2.1",
+  "description": "点击按钮将剪贴板的内容保存为单词，支持复习、管理、导出。",
+  "permissions": ["storage", "clipboardRead", "downloads", "notifications", "scripting", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "save-word": {
+      "suggested_key": {
+        "default": "Ctrl+U",
+        "mac": "Command+U"
+      },
+      "description": "保存剪贴板单词"
+    }
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+} 

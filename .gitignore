@@ -1,0 +1,25 @@
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+*~
+
+# 日志文件
+*.log
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 备份文件
+*.bak
+*.backup
+
+# 测试文件
+test/
+tests/

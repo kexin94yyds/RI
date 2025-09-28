@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>单词记录器</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="section">
+    <div class="mode-section">
+      <div class="mode-header">
+        <span class="mode-label">当前模式：</span>
+        <div class="mode-dropdown">
+          <button id="mode-switcher" class="mode-switcher-btn">
+            <span id="current-mode-name">默认</span>
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div id="mode-dropdown-menu" class="mode-dropdown-menu" style="display: none;">
+            <div class="mode-dropdown-content">
+              <div class="add-mode-item" id="add-mode-item">
+                <span class="add-mode-text">+ 添加模式</span>
+              </div>
+              <div id="modes-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="clipboard-word" class="clipboard-word">（剪贴板内容将显示在这里）</div>
+    <button id="save-btn">保存剪贴板单词（CMD+U）</button>
+    <div id="save-status" class="status"></div>
+  </div>
+  <div class="section">
+    <button id="review-btn">复习单词</button>
+    <div id="review-area" style="display:none;">
+      <div id="review-word" class="review-word"></div>
+      <button id="next-btn">下一个</button>
+      <button id="remember-btn">我记住了</button>
+    </div>
+  </div>
+  <div class="section">
+    <button id="show-list-btn">查看全部单词</button>
+    <button id="clear-all-btn">清空全部单词</button>
+    <button id="export-btn">导出TXT</button>
+    <button id="import-btn">导入TXT</button>
+    <div id="import-area" style="display:none;">
+      <textarea id="import-text" placeholder="粘贴单词列表，每行一个单词" rows="6"></textarea>
+      <div class="import-buttons">
+        <button id="paste-import-btn">粘贴并导入</button>
+        <input type="file" id="file-input" accept=".txt" style="display:none;">
+        <button id="file-import-btn">选择文件导入</button>
+        <button id="cancel-import-btn">取消</button>
+      </div>
+    </div>
+    <div id="word-list" class="word-list" style="display:none;"></div>
+  </div>
+
+  <!-- 模式管理对话框 -->
+  <div id="mode-dialog" class="mode-dialog" style="display: none;">
+    <div class="mode-dialog-content">
+      <div class="mode-dialog-header">
+        <h3 id="mode-dialog-title">添加模式</h3>
+        <button id="close-mode-dialog" class="close-btn">×</button>
+      </div>
+      <div class="mode-dialog-body">
+        <div class="input-group">
+          <label for="mode-name-input">模式名称：</label>
+          <input type="text" id="mode-name-input" placeholder="输入模式名称" maxlength="20">
+        </div>
+        <div class="mode-dialog-buttons">
+          <button id="save-mode-btn" class="save-btn">保存</button>
+          <button id="cancel-mode-btn" class="cancel-btn">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 
