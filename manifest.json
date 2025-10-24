@@ -3,10 +3,28 @@
   "name": "单词记录器",
   "version": "2.1",
   "description": "点击按钮将剪贴板的内容保存为单词，支持复习、管理、导出。",
-  "permissions": ["storage", "clipboardRead", "downloads", "notifications", "scripting", "activeTab"],
+  "permissions": [
+    "storage",
+    "clipboardRead",
+    "downloads",
+    "notifications",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "offscreen"
+  ],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
   "commands": {
     "save-word": {
       "suggested_key": {

@@ -244,10 +244,10 @@ function deleteMode(mode) {
 }
 
 // 保存单词功能（多模式版本）
-function saveWord() {
+async function saveWord() {
   let word = '';
   try {
-    word = navigator.clipboard.readText();
+    word = await navigator.clipboard.readText();
   } catch (e) {
     showStatus('无法读取剪贴板');
     return;
