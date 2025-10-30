@@ -1,25 +1,26 @@
-# 系统文件
+# Tauri
+dist/
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Node
+node_modules/
 .DS_Store
-Thumbs.db
 
-# 临时文件
-*.tmp
-*.temp
-*~
-
-# 日志文件
+# Logs
 *.log
+npm-debug.log*
 
-# 编辑器文件
+# Environment
+.env
+.env.local
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# 备份文件
-*.bak
-*.backup
-
-# 测试文件
-test/
-tests/
+# Build artifacts
+build/
+dist/

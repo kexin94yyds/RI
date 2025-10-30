@@ -1,85 +1,83 @@
-# 多模式单词记录器 Chrome 插件
+# 单词记录器 - Tauri桌面应用
 
-## 🎯 功能简介
+基于Tauri + TypeScript构建的跨平台单词记录器桌面应用。
+
+## 功能特性
+
 - **多模式管理**: 支持创建多个单词分类模式（如英语、日语、专业词汇等）
 - **一键保存**: 快速保存剪贴板单词到当前模式
 - **智能复习**: 随机抽取当前模式下的单词进行复习
 - **模式切换**: 轻松在不同单词分类间切换
 - **独立存储**: 每个模式的单词列表完全独立
 - **批量导入导出**: 支持TXT格式的批量导入和按模式导出
-- **快捷键支持**: 支持 CMD/Ctrl + U 快速保存（已增强为页面内全局监听）
+- **全局快捷键**: 支持 CMD+U (Mac) / Ctrl+U (Windows) 快速显示/隐藏窗口
 
-## 安装方法
-1. 下载本文件夹下所有文件（manifest.json、popup.html、popup.js、style.css、图标文件）。
-2. 打开 Chrome，访问 `chrome://extensions/`。
-3. 打开右上角“开发者模式”。
-4. 点击“加载已解压的扩展程序”，选择本插件文件夹。
-5. 安装完成后，点击浏览器右上角插件图标即可使用。
+## 技术栈
 
-## 🚀 使用方法
+- **前端**: TypeScript + Vite
+- **桌面框架**: Tauri 2.x (Rust)
+- **存储**: Tauri Store Plugin
+- **剪贴板**: Tauri Clipboard Manager Plugin
+- **通知**: Tauri Notification Plugin
 
-### 基础操作
-1. **复制单词**: 复制你想保存的单词到剪贴板
-2. **保存单词**: 点击插件图标，在弹窗中点击"保存剪贴板单词"或使用快捷键 CMD/Ctrl + U（已在任意网页内监听）
-3. **查看单词**: 点击"查看全部单词"展开当前模式的单词列表
+## 开发环境要求
 
-### 多模式管理
-1. **创建模式**: 点击模式下拉菜单中的"+ 添加模式"
-2. **切换模式**: 点击模式名称进行切换
-3. **编辑模式**: 点击模式右侧的"编辑"按钮修改名称
-4. **删除模式**: 点击模式右侧的"删除"按钮移除模式
+- Node.js 20.11.0 或更高版本
+- Rust (通过 [rustup](https://rustup.rs/) 安装)
+- macOS Sonoma 14+ 或 Windows 10+
 
-### 复习功能
-1. **开始复习**: 点击"复习单词"随机抽取当前模式的单词
-2. **标记记住**: 点击"我记住了"将单词从列表中移除
-3. **跳过单词**: 点击"下一个"跳过当前单词
+## 安装依赖
 
-### 导入导出
-1. **导出单词**: 点击"导出TXT"下载当前模式的单词文件
-2. **导入单词**: 点击"导入TXT"批量导入单词到当前模式
-3. **文件格式**: 支持TXT格式，每行一个单词
-
-## 📋 功能特色
-
-### 🎨 多模式系统
-- **独立分类**: 每个模式都有独立的单词列表
-- **灵活管理**: 支持添加、编辑、删除模式
-- **智能切换**: 一键切换不同单词分类
-- **数据隔离**: 不同模式的单词完全独立存储
-
-### 💾 数据管理
-- **本地存储**: 所有数据保存在浏览器本地，保护隐私
-- **批量操作**: 支持批量导入导出TXT文件
-- **实时同步**: 模式切换时数据实时更新
-- **备份友好**: 每个模式可独立导出备份
-
-### ⌨️ 快捷操作
-- **快捷键**: CMD+U (Mac) / Ctrl+U (Windows) 快速保存（若浏览器保留该组合，可在 `chrome://extensions/shortcuts` 中修改为 `Cmd/Ctrl+Shift+U` 等组合）
-- **一键操作**: 复制单词后一键保存
-- **智能提示**: 清晰的状态反馈和操作提示
-
-## ⚠️ 注意事项
-- 需要允许插件读取剪贴板权限
-- 插件数据仅保存在本地浏览器，不会上传云端
-- 建议定期导出重要模式的单词进行备份
-- 删除模式会同时删除该模式下的所有单词
-
-## 🔧 技术信息
-- **版本**: 2.1 (多模式版本)
-- **兼容性**: Chrome 88+
-- **存储**: Chrome Storage API
-- **权限**: storage, clipboardRead, downloads, notifications, scripting, activeTab
-
-## 📁 文件结构
+```bash
+npm install
 ```
-单词记录/
-├── manifest.json      # 插件配置文件
-├── popup.html         # 主界面HTML
-├── popup.js          # 主逻辑JavaScript
-├── background.js     # 后台脚本
-├── style.css         # 样式文件
-├── icon16.png        # 16x16图标
-├── icon48.png        # 48x48图标
-├── icon128.png       # 128x128图标
-└── README.md         # 说明文档
-``` 
+
+## 开发运行
+
+```bash
+npm run tauri dev
+```
+
+## 构建应用
+
+```bash
+npm run tauri build
+```
+
+构建产物将位于 `src-tauri/target/release/` 目录下。
+
+## 项目结构
+
+```
+RI/
+├── src/                    # TypeScript 前端源代码
+│   ├── main.ts            # 主入口文件
+│   └── utils/             # 工具函数
+│       ├── storage.ts     # 存储适配器
+│       ├── clipboard.ts   # 剪贴板工具
+│       ├── shortcut.ts    # 快捷键处理
+│       └── notification.ts # 通知工具
+├── src-tauri/             # Rust 后端
+│   ├── src/
+│   │   ├── main.rs        # Rust 入口
+│   │   └── lib.rs         # 主逻辑和IPC处理
+│   ├── Cargo.toml         # Rust 依赖配置
+│   └── tauri.conf.json    # Tauri 配置
+├── index.html             # 主HTML文件
+├── style.css              # 样式文件
+└── package.json           # Node.js 依赖配置
+```
+
+## 从Chrome插件转换
+
+本项目已从Chrome插件成功转换为Tauri桌面应用，主要变更：
+
+- `chrome.storage` → `@tauri-apps/plugin-store`
+- `navigator.clipboard` → `@tauri-apps/plugin-clipboard-manager`
+- `chrome.commands` → `@tauri-apps/plugin-global-shortcut`
+- `chrome.notifications` → `@tauri-apps/plugin-notification`
+- `chrome.downloads` → `@tauri-apps/plugin-dialog` + `@tauri-apps/api/fs`
+
+## 许可证
+
+MIT License

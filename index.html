@@ -2,10 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>单词记录器</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- 拖拽区域 -->
+  <div class="titlebar"></div>
+  
   <div class="section">
     <div class="mode-section">
       <div class="mode-header">
@@ -27,7 +31,7 @@
       </div>
     </div>
     <div id="clipboard-word" class="clipboard-word">（剪贴板内容将显示在这里）</div>
-    <button id="save-btn">保存剪贴板单词（CMD+U）</button>
+    <button id="save-btn">保存剪贴板单词（Shift+CMD+U）</button>
     <div id="save-status" class="status"></div>
   </div>
   <div class="section">
@@ -75,6 +79,7 @@
     </div>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="app.js"></script>
 </body>
-</html> 
+</html>
+
