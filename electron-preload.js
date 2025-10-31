@@ -13,7 +13,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 剪贴板 API
   clipboard: {
     readText: () => ipcRenderer.invoke('clipboard-read'),
-    writeText: (text) => ipcRenderer.invoke('clipboard-write', text)
+    writeText: (text) => ipcRenderer.invoke('clipboard-write', text),
+    readImage: () => ipcRenderer.invoke('clipboard-read-image'),
+    readFilePaths: () => ipcRenderer.invoke('clipboard-read-file-paths'),
+    availableFormats: () => ipcRenderer.invoke('clipboard-available-formats'),
+    writeImage: (imagePath) => ipcRenderer.invoke('clipboard-write-image', imagePath)
+  },
+  
+  // 文件系统 API
+  fs: {
+    openPath: (path) => ipcRenderer.invoke('open-path', path)
   },
   
   // 窗口控制 API
@@ -23,7 +32,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     toggle: () => ipcRenderer.invoke('window-toggle')
   },
   
+  // Shell API - 打开外部链接
+  shell: {
+    openExternal: (url) => ipcRenderer.invoke('shell-open-external', url)
+  },
+  
   // 系统信息
   platform: process.platform
 });
+
 

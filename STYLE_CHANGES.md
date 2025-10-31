@@ -442,3 +442,4 @@ background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%);
 **维护者：** AI Assistant  
 **项目：** 单词记录器 Electron 版  
 
+

@@ -1,6 +1,7 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, nativeImage, shell } = require('electron');
 const Store = require('electron-store');
 const path = require('path');
+const fs = require('fs');
 
 // 初始化存储
 const store = new Store();
@@ -50,8 +51,10 @@ async function showOnActiveSpace() {
 // 创建主窗口
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 680,
+    width: 600,
+    height: 600,
+    minWidth: 900,
+    minHeight: 600,
     show: false,
     frame: false, // 无边框
     resizable: true,
@@ -100,22 +103,13 @@ function createWindow() {
   });
 
   // 开发模式打开开发者工具
-  if (process.argv.includes('--enable-logging')) {
-    mainWindow.webContents.openDevTools();
-  }
+  // 临时启用以调试图片功能
+  mainWindow.webContents.openDevTools();
 }
 
 // 快速保存（不显示窗口，只显示通知）
 async function quickSave() {
   try {
-    // 读取剪贴板内容
-    const word = clipboard.readText();
-    
-    if (!word || word.trim() === '') {
-      showNotification('保存失败', '剪贴板为空');
-      return;
-    }
-
     // 获取当前模式和单词列表
     const wordModes = store.get('wordModes') || [{ id: 'default', name: '默认', words: [] }];
     const currentWordMode = store.get('currentWordMode') || wordModes[0];
@@ -129,17 +123,136 @@ async function quickSave() {
 
     const mode = wordModes[modeIndex];
     
+    // 检查剪贴板中是否有图片
+    const image = clipboard.readImage();
+    const hasValidImage = !image.isEmpty();
+    
+    // 检查是否是图片文件路径
+    const text = clipboard.readText();
+    let hasImageFile = false;
+    if (text && (text.startsWith('/') || text.startsWith('file://'))) {
+      const filePath = text.replace('file://', '');
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filePath).toLowerCase();
+        hasImageFile = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'].includes(ext);
+      }
+    }
+    
+    let itemToSave;
+    let displayText;
+    
+    // 优先处理图片
+    if (hasValidImage || hasImageFile) {
+      let imageData = null;
+      
+      if (hasValidImage) {
+        // 直接读取图片数据
+        try {
+          const size = image.getSize();
+          const timestamp = Date.now();
+          const fileName = `image_${timestamp}.png`;
+          const thumbFileName = `image_thumb_${timestamp}.png`;
+          const imagesDir = getImagesDir();
+          const imagePath = path.join(imagesDir, fileName);
+          const thumbPath = path.join(imagesDir, thumbFileName);
+          const pngBuffer = image.toPNG();
+          fs.writeFileSync(imagePath, pngBuffer);
+          const thumbnail = image.resize({ width: 48, height: 48 });
+          const thumbBuffer = thumbnail.toPNG();
+          fs.writeFileSync(thumbPath, thumbBuffer);
+          
+          imageData = {
+            type: 'image',
+            fileName: fileName,
+            thumbFileName: thumbFileName,
+            width: size.width,
+            height: size.height,
+            size: pngBuffer.length,
+            path: imagePath
+          };
+        } catch (error) {
+          console.error('读取图片失败:', error);
+        }
+      } else if (hasImageFile) {
+        // 从文件路径读取图片
+        try {
+          const filePath = text.replace('file://', '');
+          const imageBuffer = fs.readFileSync(filePath);
+          const fileImage = nativeImage.createFromBuffer(imageBuffer);
+          if (!fileImage.isEmpty()) {
+            const size = fileImage.getSize();
+            const timestamp = Date.now();
+            const fileName = `image_${timestamp}.png`;
+            const thumbFileName = `image_thumb_${timestamp}.png`;
+            const imagesDir = getImagesDir();
+            const imagePath = path.join(imagesDir, fileName);
+            const thumbPath = path.join(imagesDir, thumbFileName);
+            const pngBuffer = fileImage.toPNG();
+            fs.writeFileSync(imagePath, pngBuffer);
+            const thumbnail = fileImage.resize({ width: 48, height: 48 });
+            const thumbBuffer = thumbnail.toPNG();
+            fs.writeFileSync(thumbPath, thumbBuffer);
+            
+            imageData = {
+              type: 'image',
+              fileName: fileName,
+              thumbFileName: thumbFileName,
+              width: size.width,
+              height: size.height,
+              size: pngBuffer.length,
+              path: imagePath
+            };
+          }
+        } catch (error) {
+          console.error('读取图片文件失败:', error);
+        }
+      }
+      
+      if (imageData) {
+        itemToSave = imageData;
+        displayText = `图片 (${imageData.width}x${imageData.height})`;
+      }
+    }
+    
+    // 如果没有图片，处理文本
+    if (!itemToSave) {
+      const trimmedText = text ? text.trim() : '';
+      if (!trimmedText) {
+        showNotification('保存失败', '剪贴板为空');
+        return;
+      }
+      
+      itemToSave = {
+        type: 'text',
+        content: trimmedText
+      };
+      displayText = trimmedText.length > 20 ? trimmedText.substring(0, 20) + '...' : trimmedText;
+    }
+
     // 检查是否已存在
-    if (!mode.words.includes(word.trim())) {
-      mode.words.push(word.trim());
-      // 更新数组中的模式对象
+    const isDuplicate = mode.words.some(word => {
+      if (typeof word === 'string') {
+        return itemToSave.type === 'text' && word === itemToSave.content;
+      }
+      if (typeof word === 'object') {
+        if (word.type === 'image' && itemToSave.type === 'image') {
+          return word.fileName === itemToSave.fileName;
+        }
+        if (word.type === 'text' && itemToSave.type === 'text') {
+          return word.content === itemToSave.content;
+        }
+      }
+      return false;
+    });
+    
+    if (!isDuplicate) {
+      mode.words.unshift(itemToSave);
       wordModes[modeIndex] = mode;
-      // 保存到存储（同时更新当前模式，避免渲染进程读到旧的 currentWordMode）
       store.set('wordModes', wordModes);
       store.set('currentWordMode', mode);
-      showNotification('已保存', `"${word.trim()}" 已保存到 ${mode.name}`);
+      showNotification('已保存', displayText);
     } else {
-      showNotification('提示', `"${word.trim()}" 已存在`);
+      showNotification('提示', '内容已存在');
     }
   } catch (error) {
     console.error('快速保存失败:', error);
@@ -239,6 +352,19 @@ ipcMain.handle('store-clear', async () => {
   store.clear();
 });
 
+// 获取图片存储目录
+function getImagesDir() {
+  const userDataPath = app.getPath('userData');
+  const imagesDir = path.join(userDataPath, 'clipboard-images');
+  
+  // 确保目录存在
+  if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+  }
+  
+  return imagesDir;
+}
+
 // IPC 处理：剪贴板相关
 ipcMain.handle('clipboard-read', async () => {
   return clipboard.readText();
@@ -246,6 +372,190 @@ ipcMain.handle('clipboard-read', async () => {
 
 ipcMain.handle('clipboard-write', async (event, text) => {
   clipboard.writeText(text);
+});
+
+ipcMain.handle('clipboard-read-image', async () => {
+  const image = clipboard.readImage();
+  
+  if (image.isEmpty()) {
+    return null;
+  }
+  
+  try {
+    // 获取图片尺寸
+    const size = image.getSize();
+    
+    // 生成唯一的文件名（基于时间戳）
+    const timestamp = Date.now();
+    const fileName = `image_${timestamp}.png`;
+    const thumbFileName = `image_thumb_${timestamp}.png`;
+    
+    // 获取图片存储目录
+    const imagesDir = getImagesDir();
+    const imagePath = path.join(imagesDir, fileName);
+    const thumbPath = path.join(imagesDir, thumbFileName);
+    
+    // 保存原图
+    const pngBuffer = image.toPNG();
+    fs.writeFileSync(imagePath, pngBuffer);
+    
+    // 创建并保存缩略图（48x48）
+    const thumbnail = image.resize({ width: 48, height: 48 });
+    const thumbBuffer = thumbnail.toPNG();
+    fs.writeFileSync(thumbPath, thumbBuffer);
+    
+    // 返回图片信息
+    return {
+      type: 'image',
+      fileName: fileName,
+      thumbFileName: thumbFileName,
+      width: size.width,
+      height: size.height,
+      size: pngBuffer.length,
+      path: imagePath,
+      dataURL: `data:image/png;base64,${pngBuffer.toString('base64')}`
+    };
+  } catch (error) {
+    console.error('读取图片失败:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('clipboard-read-file-paths', async () => {
+  try {
+    // 在 Electron 中，文件路径可能在 text 中
+    const text = clipboard.readText();
+    
+    // 检查是否是文件路径
+    if (text && (text.startsWith('/') || text.startsWith('file://'))) {
+      let filePath = text.replace('file://', '');
+      
+      // 检查文件是否存在且是图片
+      if (fs.existsSync(filePath)) {
+        const ext = path.extname(filePath).toLowerCase();
+        const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'];
+        
+        if (imageExts.includes(ext)) {
+          console.log('检测到图片文件:', filePath);
+          
+          // 读取图片文件
+          const imageBuffer = fs.readFileSync(filePath);
+          const image = nativeImage.createFromBuffer(imageBuffer);
+          
+          if (!image.isEmpty()) {
+            const size = image.getSize();
+            const timestamp = Date.now();
+            const fileName = `image_${timestamp}.png`;
+            const thumbFileName = `image_thumb_${timestamp}.png`;
+            
+            const imagesDir = getImagesDir();
+            const imagePath = path.join(imagesDir, fileName);
+            const thumbPath = path.join(imagesDir, thumbFileName);
+            
+            // 保存原图
+            const pngBuffer = image.toPNG();
+            fs.writeFileSync(imagePath, pngBuffer);
+            
+            // 保存缩略图
+            const thumbnail = image.resize({ width: 48, height: 48 });
+            const thumbBuffer = thumbnail.toPNG();
+            fs.writeFileSync(thumbPath, thumbBuffer);
+            
+            return {
+              type: 'image',
+              fileName: fileName,
+              thumbFileName: thumbFileName,
+              width: size.width,
+              height: size.height,
+              size: pngBuffer.length,
+              path: imagePath,
+              dataURL: `data:image/png;base64,${pngBuffer.toString('base64')}`
+            };
+          }
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('读取文件路径失败:', error);
+    return null;
+  }
+});
+
+ipcMain.handle('clipboard-available-formats', async () => {
+  const formats = clipboard.availableFormats();
+  
+  // 检查 clipboard.readImage() 是否有图片
+  const image = clipboard.readImage();
+  const hasValidImage = !image.isEmpty();
+  
+  // 检查是否是图片文件路径
+  const text = clipboard.readText();
+  let hasImageFile = false;
+  if (text && (text.startsWith('/') || text.startsWith('file://'))) {
+    const filePath = text.replace('file://', '');
+    if (fs.existsSync(filePath)) {
+      const ext = path.extname(filePath).toLowerCase();
+      hasImageFile = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'].includes(ext);
+    }
+  }
+  
+  console.log('Clipboard formats:', formats);
+  console.log('Has valid image:', hasValidImage);
+  console.log('Has image file:', hasImageFile);
+  console.log('Text content:', text ? text.substring(0, 100) : 'none');
+  
+  return {
+    formats: formats,
+    hasText: formats.some(f => f.includes('text') || f === 'public.utf8-plain-text'),
+    hasHTML: formats.some(f => f.includes('html')),
+    hasImage: hasValidImage || hasImageFile,
+    hasRTF: formats.some(f => f.includes('rtf'))
+  };
+});
+
+// 复制图片到剪贴板
+ipcMain.handle('clipboard-write-image', async (event, imagePath) => {
+  try {
+    if (fs.existsSync(imagePath)) {
+      const image = nativeImage.createFromPath(imagePath);
+      clipboard.writeImage(image);
+      console.log('图片已复制到剪贴板:', imagePath);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('复制图片失败:', error);
+    return false;
+  }
+});
+
+// 打开文件或路径
+ipcMain.handle('open-path', async (event, filePath) => {
+  try {
+    if (fs.existsSync(filePath)) {
+      await shell.openPath(filePath);
+      console.log('已打开文件:', filePath);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('打开文件失败:', error);
+    return false;
+  }
+});
+
+// 打开外部链接（URL）
+ipcMain.handle('shell-open-external', async (event, url) => {
+  try {
+    await shell.openExternal(url);
+    console.log('已打开链接:', url);
+    return true;
+  } catch (error) {
+    console.error('打开链接失败:', error);
+    return false;
+  }
 });
 
 // IPC 处理：窗口控制

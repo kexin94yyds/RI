@@ -10,70 +10,126 @@
   <!-- 拖拽区域 -->
   <div class="titlebar"></div>
   
-  <div class="section">
-    <div class="mode-section">
-      <div class="mode-header">
-        <span class="mode-label">当前模式：</span>
-        <div class="mode-dropdown">
-          <button id="mode-switcher" class="mode-switcher-btn">
-            <span id="current-mode-name">默认</span>
-            <span class="dropdown-arrow">▼</span>
-          </button>
-          <div id="mode-dropdown-menu" class="mode-dropdown-menu" style="display: none;">
-            <div class="mode-dropdown-content">
-              <div class="add-mode-item" id="add-mode-item">
-                <span class="add-mode-text">+ 添加模式</span>
-              </div>
-              <div id="modes-list"></div>
-            </div>
+  <!-- 主容器：三栏布局 -->
+  <div class="app-container">
+    <!-- 左侧边栏：模式列表 -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <button id="all-history-btn" class="sidebar-item all-history" title="查看全部历史">
+          历史记录
+        </button>
+        <button id="add-mode-btn" class="sidebar-item add-mode" title="添加新模式">
+          添加模式
+        </button>
+      </div>
+      <div class="sidebar-content" id="modes-sidebar">
+        <!-- 模式列表将动态生成 -->
+      </div>
+    </div>
+
+    <!-- 中间历史记录面板 -->
+    <div class="history-panel">
+      <!-- 顶部搜索栏 -->
+      <div class="search-bar">
+        <div class="search-input-wrapper">
+          <input type="text" id="search-input" class="search-input" placeholder="搜索内容...">
+          <button id="clear-search-btn" class="clear-search-btn" style="display: none;">✕</button>
+        </div>
+      </div>
+
+      <!-- 剪贴板预览区 -->
+      <div class="clipboard-preview">
+        <div class="clipboard-label">剪贴板内容</div>
+        <div id="clipboard-word" class="clipboard-content">（剪贴板内容将显示在这里）</div>
+        <button id="save-btn" class="clipboard-save-btn">保存</button>
+      </div>
+
+      <!-- 历史记录列表 -->
+      <div class="history-list-area">
+        <div id="history-list" class="history-list">
+          <!-- 历史记录将动态生成 -->
+        </div>
+        <div id="empty-state" class="empty-state" style="display: none;">
+          <div class="empty-icon">📝</div>
+          <div class="empty-text">暂无内容</div>
+          <div class="empty-hint">保存剪贴板内容开始记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧内容预览/详情区 -->
+    <div class="preview-panel">
+      <!-- 预览内容区 -->
+      <div class="preview-content-area">
+        <div id="preview-content" class="preview-content">
+          <div class="preview-empty">
+            选择一个项目查看详情
           </div>
         </div>
       </div>
-    </div>
-    <div id="clipboard-word" class="clipboard-word">（剪贴板内容将显示在这里）</div>
-    <button id="save-btn">保存剪贴板单词（Shift+CMD+U）</button>
-    <div id="save-status" class="status"></div>
-  </div>
-  <div class="section">
-    <button id="review-btn">复习单词</button>
-    <div id="review-area" style="display:none;">
-      <div id="review-word" class="review-word"></div>
-      <button id="next-btn">下一个</button>
-      <button id="remember-btn">我记住了</button>
-    </div>
-  </div>
-  <div class="section">
-    <button id="show-list-btn">查看全部单词</button>
-    <button id="clear-all-btn">清空全部单词</button>
-    <button id="export-btn">导出TXT</button>
-    <button id="import-btn">导入TXT</button>
-    <div id="import-area" style="display:none;">
-      <textarea id="import-text" placeholder="粘贴单词列表，每行一个单词" rows="6"></textarea>
-      <div class="import-buttons">
-        <button id="paste-import-btn">粘贴并导入</button>
-        <input type="file" id="file-input" accept=".txt" style="display:none;">
-        <button id="file-import-btn">选择文件导入</button>
-        <button id="cancel-import-btn">取消</button>
+      
+      <!-- 隐藏的按钮，用于保持功能但不显示 -->
+      <div style="display: none;">
+        <button id="export-btn"></button>
+        <button id="import-btn"></button>
+        <button id="review-btn"></button>
+        <button id="clear-all-btn"></button>
+        <div id="save-status"></div>
       </div>
     </div>
-    <div id="word-list" class="word-list" style="display:none;"></div>
   </div>
 
   <!-- 模式管理对话框 -->
-  <div id="mode-dialog" class="mode-dialog" style="display: none;">
-    <div class="mode-dialog-content">
-      <div class="mode-dialog-header">
+  <div id="mode-dialog" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
         <h3 id="mode-dialog-title">添加模式</h3>
-        <button id="close-mode-dialog" class="close-btn">×</button>
+        <button id="close-mode-dialog" class="close-btn">✕</button>
       </div>
-      <div class="mode-dialog-body">
+      <div class="modal-body">
         <div class="input-group">
           <label for="mode-name-input">模式名称：</label>
-          <input type="text" id="mode-name-input" placeholder="输入模式名称" maxlength="20">
+          <input type="text" id="mode-name-input" placeholder="例如：学习、编程、工作..." maxlength="20">
         </div>
-        <div class="mode-dialog-buttons">
-          <button id="save-mode-btn" class="save-btn">保存</button>
-          <button id="cancel-mode-btn" class="cancel-btn">取消</button>
+        <div class="modal-buttons">
+          <button id="cancel-mode-btn" class="btn-secondary">取消</button>
+          <button id="save-mode-btn" class="btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 复习对话框 -->
+  <div id="review-dialog" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>复习模式</h3>
+        <button id="close-review-dialog" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="review-word" class="review-word"></div>
+        <div class="modal-buttons">
+          <button id="remember-btn" class="btn-secondary">记住了</button>
+          <button id="next-btn" class="btn-primary">下一个</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 导入对话框 -->
+  <div id="import-dialog" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>导入内容</h3>
+        <button id="close-import-dialog" class="close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="import-text" class="import-textarea" placeholder="粘贴内容列表，每行一个..." rows="8"></textarea>
+        <div class="modal-buttons">
+          <button id="paste-import-btn" class="btn-secondary">粘贴并导入</button>
+          <input type="file" id="file-input" accept=".txt" style="display:none;">
+          <button id="file-import-btn" class="btn-secondary">选择文件</button>
+          <button id="cancel-import-btn" class="btn-primary">确定</button>
         </div>
       </div>
     </div>
