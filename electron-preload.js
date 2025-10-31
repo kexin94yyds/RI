@@ -17,7 +17,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readImage: () => ipcRenderer.invoke('clipboard-read-image'),
     readFilePaths: () => ipcRenderer.invoke('clipboard-read-file-paths'),
     availableFormats: () => ipcRenderer.invoke('clipboard-available-formats'),
-    writeImage: (imagePath) => ipcRenderer.invoke('clipboard-write-image', imagePath)
+    writeImage: (imagePath) => ipcRenderer.invoke('clipboard-write-image', imagePath),
+    saveDataURL: (dataUrl) => ipcRenderer.invoke('clipboard-save-dataurl', dataUrl)
   },
   
   // 文件系统 API
@@ -40,5 +41,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 系统信息
   platform: process.platform
 });
-
 

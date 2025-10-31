@@ -1,0 +1,513 @@
+/* 覆盖所有可能的边框和线条 */
+.floating-md-editor,
+.floating-md-editor *,
+.floating-md-editor *::before,
+.floating-md-editor *::after,
+textarea,
+textarea:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.floating-md-editor {
+  position: fixed;
+  top: 50px;
+  right: 50px;
+  width: 500px;
+  height: 600px;
+  min-width: 300px;
+  min-height: 200px;
+  max-width: 90vw;
+  max-height: 90vh;
+  background-color: #fff;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  z-index: 9999999;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.floating-md-editor:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.md-toolbar {
+  display: flex;
+  padding: 8px;
+  background-color: #f5f5f5;
+  align-items: center;
+  user-select: none;
+  flex-shrink: 0; /* 防止工具栏被压缩 */
+  position: relative;
+}
+
+/* 简化版工具栏 */
+.md-toolbar-minimal {
+  background-color: rgba(255, 255, 255, 0.9);
+  height: 12px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease, height 0.2s ease, padding 0.2s ease;
+}
+
+.md-toolbar-minimal:hover {
+  opacity: 1;
+  height: 20px;
+  padding: 4px;
+  background-color: #f9f9f9;
+}
+
+.md-drag-handle {
+  cursor: grab;
+  padding: 0 5px;
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.md-title {
+  flex-grow: 1;
+  font-weight: bold;
+}
+
+.md-button {
+  margin: 0 2px;
+  padding: 3px 6px;
+  background-color: #e0e0e0;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.md-button:hover {
+  background-color: #d0d0d0;
+}
+
+.md-close {
+  margin-left: 0;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: bold;
+  color: transparent;
+  transition: all 0.2s ease;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-close-hidden {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.md-toolbar-minimal:hover .md-close-hidden {
+  opacity: 1;
+}
+
+.md-close:hover {
+  background-color: #ff3333;
+  color: white;
+}
+
+.md-export {
+  margin-left: 0;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: bold;
+  color: transparent;
+  transition: all 0.2s ease;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-export:hover {
+  background-color: #4285f4;
+  color: #fff;
+}
+
+.md-clear-cache {
+  margin-left: 0;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: bold;
+  color: transparent;
+  transition: all 0.2s ease;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-clear-cache:hover {
+  background-color: #FF9500;
+  color: #4c0000;
+}
+
+.md-quick-copy {
+  margin-left: 0;
+  padding: 0;
+  background-color: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: bold;
+  color: transparent;
+  transition: all 0.2s ease;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-quick-copy:hover {
+  background-color: #9A3FCD;
+  color: #fff;
+}
+
+.md-editor {
+  flex-grow: 1;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 100% !important;
+  height: 100% !important; /* 占据剩余空间 */
+  min-height: 200px; /* 最小高度 */
+  display: block; /* 确保是块级元素 */
+  background-color: #fff !important;
+  position: relative !important;
+  z-index: 1 !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: transparent transparent; /* Firefox 默认隐藏 */
+}
+
+/* 富文本编辑器内容样式 */
+.md-editor h1, .md-editor h2, .md-editor h3, .md-editor h4, .md-editor h5, .md-editor h6 {
+  margin: 16px 0 8px 0;
+  font-weight: bold;
+}
+
+.md-editor h1 { font-size: 24px; }
+.md-editor h2 { font-size: 20px; }
+.md-editor h3 { font-size: 16px; }
+.md-editor h4 { font-size: 14px; }
+.md-editor h5 { font-size: 12px; }
+.md-editor h6 { font-size: 11px; }
+
+.md-editor p {
+  margin: 8px 0;
+}
+
+.md-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.md-editor th, .md-editor td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.md-editor th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.md-editor tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.md-editor blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 10px;
+  margin-left: 0;
+  color: #777;
+  font-style: italic;
+}
+
+.md-editor ul, .md-editor ol {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.md-editor li {
+  margin: 4px 0;
+}
+
+.md-editor code {
+  background-color: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+
+.md-editor pre {
+  background-color: #f6f8fa;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+  font-family: 'Consolas', monospace;
+}
+
+.md-editor a {
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+.md-editor a:hover {
+  text-decoration: none;
+}
+
+.md-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+.md-editor::placeholder {
+  color: #aaa !important;
+  opacity: 0.7 !important;
+}
+
+/* 调整滚动条样式，确保不会产生额外边框 */
+.md-editor::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+
+.md-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md-editor::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.md-editor:hover::-webkit-scrollbar-thumb,
+.md-editor:focus::-webkit-scrollbar-thumb {
+  background: #ddd;
+}
+
+.md-editor {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: transparent transparent; /* Firefox 默认隐藏 */
+}
+
+.md-editor:hover {
+  scrollbar-color: #ddd transparent; /* Firefox 悬停时显示 */
+}
+
+.md-preview {
+  display: none;
+  flex-grow: 1;
+  padding: 10px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%; /* 占据剩余空间 */
+  background-color: #fafafa;
+}
+
+/* Markdown 预览样式 */
+.md-preview h1 {
+  font-size: 24px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.md-preview h2 {
+  font-size: 20px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+
+.md-preview h3 {
+  font-size: 16px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.md-preview p {
+  margin-bottom: 10px;
+}
+
+.md-preview code {
+  background-color: #f0f0f0;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Consolas', monospace;
+}
+
+.md-preview pre {
+  background-color: #f6f8fa;
+  padding: 10px;
+  border-radius: 5px;
+  overflow-x: auto;
+}
+
+.md-preview blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 10px;
+  margin-left: 0;
+  color: #777;
+}
+
+.md-preview ul, .md-preview ol {
+  padding-left: 20px;
+}
+
+.md-preview a {
+  color: #4285f4;
+  text-decoration: none;
+}
+
+.md-preview a:hover {
+  text-decoration: underline;
+}
+
+.md-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.md-preview input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.md-preview th, .md-preview td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.md-preview th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.md-preview tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* 调整大小句柄样式 */
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle-n {
+  top: 0;
+  left: 5px;
+  right: 5px;
+  height: 5px;
+  cursor: n-resize;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 5px;
+  right: 5px;
+  height: 5px;
+  cursor: s-resize;
+}
+
+.resize-handle-e {
+  top: 5px;
+  bottom: 5px;
+  right: 0;
+  width: 5px;
+  cursor: e-resize;
+}
+
+.resize-handle-w {
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 5px;
+  cursor: w-resize;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  cursor: ne-resize;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  cursor: nw-resize;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  cursor: se-resize;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  cursor: sw-resize;
+}
+
+/* 调整大小时的视觉反馈 */
+.floating-md-editor.resizing {
+  transition: none;
+}
+
+.floating-md-editor.resizing .resize-handle {
+  background: rgba(66, 133, 244, 0.3);
+} 

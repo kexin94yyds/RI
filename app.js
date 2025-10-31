@@ -12,6 +12,14 @@ let isAllHistoryMode = false; // 是否在全局历史记录模式
 let editingItemIndex = -1; // 正在编辑的列表项索引
 let originalItemText = ""; // 列表项编辑前的原始文本
 
+// HTML -> 纯文本（用于搜索、标题、复制）
+function htmlToPlain(html) {
+  if (!html) return "";
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || '').trim();
+}
+
 // 初始化
 document.addEventListener("DOMContentLoaded", async () => {
   await loadModes();
@@ -90,9 +98,35 @@ async function showClipboard() {
         console.log('图片数据为空或无效');
       }
     }
-    
-    // 处理文本
+    // 处理文本（可能是 Markdown 内嵌图片或 dataURL 图片）
     const text = await window.electronAPI.clipboard.readText();
+    // Markdown: ![alt](data:image/...;base64,....)
+    let dataUrl = null;
+    const mdMatch = text && text.match(/!\[[^\]]*\]\((data:image\/(?:png|jpe?g|gif|webp);base64,[^)]+)\)/i);
+    if (mdMatch && mdMatch[1]) {
+      dataUrl = mdMatch[1];
+    }
+    // 纯 dataURL 文本
+    if (!dataUrl && text && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(text)) {
+      dataUrl = text;
+    }
+    // 如果检测到图片 dataURL，转存并作为图片处理
+    if (dataUrl) {
+      const imageData = await window.electronAPI.clipboard.saveDataURL(dataUrl);
+      if (imageData && imageData.dataURL) {
+        currentClipboardData = imageData;
+        clipboardWordEl.innerHTML = `
+          <div style=\"display: flex; align-items: center; gap: 8px;\">
+            <img src=\"${imageData.dataURL}\" style=\"max-width: 40px; max-height: 40px; border-radius: 4px;\" />
+            <span>图片 (${imageData.width}x${imageData.height})</span>
+          </div>
+        `;
+        console.log('已将 dataURL 转为图片并展示');
+        return;
+      }
+    }
+
+    // 纯文本处理
     currentClipboardData = { type: 'text', content: text || "" };
     
     const maxLength = 120;
@@ -514,6 +548,9 @@ function updateHistoryList() {
         if (typeof word === 'object' && word.type === 'text') {
           return word.content.toLowerCase().includes(searchQuery.toLowerCase());
         }
+        if (typeof word === 'object' && word.type === 'rich') {
+          return htmlToPlain(word.html).toLowerCase().includes(searchQuery.toLowerCase());
+        }
         if (typeof word === 'object' && word.type === 'image') {
           // 图片可以通过尺寸搜索
           const dimensionText = `${word.width}x${word.height}`;
@@ -581,12 +618,33 @@ function createHistoryItem(word, index) {
       </div>
     `;
     item.setAttribute("data-word", JSON.stringify(normalized));
+  } else if (normalized.type === 'rich') {
+    const firstImg = /<img[^>]+src=["']([^"']+)["']/i.exec(normalized.html || '');
+    const title = htmlToPlain(normalized.html).slice(0, 20) || '笔记';
+    const thumb = firstImg ? `<img src="${firstImg[1]}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
+    contentDiv.innerHTML = `
+      <div style=\"display: flex; align-items: center; gap: 8px;\">${thumb}
+        <span class=\"history-item-text\" style=\"font-size: 12px;\">${escapeHtml(title)}</span>
+      </div>
+    `;
+    item.setAttribute("data-word", '[rich]');
   } else {
     // 显示文本
-    const textDiv = document.createElement("div");
-    textDiv.className = "history-item-text";
-    textDiv.textContent = normalized.content;
-    contentDiv.appendChild(textDiv);
+    const isDataUrlImg = typeof normalized.content === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(normalized.content);
+    if (isDataUrlImg) {
+      contentDiv.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <img src="${normalized.content}" 
+               style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" />
+          <span class="history-item-text" style="font-size: 12px; color: #666;">内嵌图片</span>
+        </div>
+      `;
+    } else {
+      const textDiv = document.createElement("div");
+      textDiv.className = "history-item-text";
+      textDiv.textContent = normalized.content;
+      contentDiv.appendChild(textDiv);
+    }
     item.setAttribute("data-word", normalized.content);
   }
 
@@ -601,10 +659,7 @@ function createHistoryItem(word, index) {
 
   // 双击进入编辑模式（仅文本）
   item.addEventListener("dblclick", (e) => {
-    if (normalized.type === 'image') {
-      // 图片不支持编辑
-      return;
-    }
+    if (normalized.type !== 'text') return; // 仅文本支持编辑
     if (isAllHistoryMode) {
       alert("在全局历史记录模式下无法编辑，请切换到具体模式");
       return;
@@ -699,7 +754,111 @@ function updatePreview() {
              onerror="this.alt='图片加载失败'"/>
       </div>
     `;
+  } else if (normalized.type === 'rich') {
+    // 显示富文本笔记（与笔记窗口一致）
+    previewContent.innerHTML = `
+      <div class="preview-rich-editor" 
+           contenteditable="true" 
+           style="padding: 20px; line-height: 1.6; min-height: 100%; outline: none; font-size: 14px; color: #333; overflow-y: auto;"
+           data-placeholder="在此编辑笔记内容...">
+        ${normalized.html || ''}
+      </div>
+    `;
+    
+    // 设置富文本编辑器事件监听
+    const richEditor = document.querySelector('.preview-rich-editor');
+    if (richEditor) {
+      // 存储原始内容用于比较
+      richEditor.setAttribute('data-original', normalized.html || '');
+      
+      // 处理占位符
+      const updatePlaceholder = () => {
+        if (!richEditor.textContent.trim()) {
+          richEditor.setAttribute('data-placeholder', '在此编辑笔记内容...');
+        } else {
+          richEditor.removeAttribute('data-placeholder');
+        }
+      };
+      
+      // 输入事件 - 自动保存
+      let saveTimeout = null;
+      richEditor.addEventListener('input', () => {
+        updatePlaceholder();
+        
+        // 防抖自动保存
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          handleRichEditorSave(richEditor);
+        }, 1000);
+      });
+      
+      // 焦点事件
+      richEditor.addEventListener('focus', updatePlaceholder);
+      richEditor.addEventListener('blur', () => {
+        updatePlaceholder();
+        handleRichEditorSave(richEditor);
+      });
+      
+      // 键盘事件
+      richEditor.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          richEditor.blur();
+        }
+        // Tab 键插入空格
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+        }
+        e.stopPropagation();
+      });
+      
+      // 图片粘贴支持
+      richEditor.addEventListener('paste', async (e) => {
+        const items = e.clipboardData.items;
+        
+        // 检查是否有图片
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            e.preventDefault();
+            const file = items[i].getAsFile();
+            await handleRichEditorImagePaste(richEditor, file);
+            return;
+          }
+        }
+        
+        // 处理富文本
+        if (e.clipboardData.types.includes('text/html')) {
+          e.preventDefault();
+          const html = e.clipboardData.getData('text/html');
+          document.execCommand('insertHTML', false, html);
+        }
+      });
+      
+      // 图片点击放大
+      richEditor.addEventListener('click', (e) => {
+        if (e.target.tagName === 'IMG') {
+          showImageModal(e.target.src);
+        }
+      });
+      
+      // 初始化占位符状态
+      updatePlaceholder();
+    }
   } else {
+    const isDataUrlImg = typeof normalized.content === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(normalized.content);
+    if (isDataUrlImg) {
+      // 显示 dataURL 图片
+      previewContent.innerHTML = `
+        <div class="preview-image-container">
+          <img src="${normalized.content}" 
+               class="preview-image" 
+               alt="图片预览"
+               style="cursor: default;"/>
+        </div>
+      `;
+      return;
+    }
     // 直接显示可编辑的 textarea - 纯净模式，无按钮
     previewContent.innerHTML = `
       <textarea 
@@ -819,6 +978,184 @@ async function handlePreviewTextBlur() {
   }
 }
 
+// 处理富文本编辑器保存
+async function handleRichEditorSave(richEditor) {
+  if (isAllHistoryMode) {
+    showStatus("全局历史记录模式下无法编辑");
+    updatePreview();
+    return;
+  }
+  
+  if (!richEditor || !currentMode) return;
+  
+  const newHtml = richEditor.innerHTML;
+  const originalHtml = richEditor.getAttribute('data-original');
+  
+  // 如果内容没有变化，不保存
+  if (newHtml === originalHtml) {
+    return;
+  }
+  
+  // 检查内容是否为空（只有空白）
+  const plainText = htmlToPlain(newHtml);
+  if (!plainText.trim()) {
+    showStatus("内容不能为空");
+    updatePreview(); // 恢复原内容
+    return;
+  }
+
+  const words = currentMode.words;
+  const originalIndex = words.findIndex(w => {
+    const normalized = (typeof w === 'string') ? { type: 'text', content: w } : w;
+    return normalized.type === 'rich' && normalized.html === originalHtml;
+  });
+  
+  if (originalIndex !== -1) {
+    // 更新内容
+    if (typeof words[originalIndex] === 'object' && words[originalIndex].type === 'rich') {
+      words[originalIndex].html = newHtml;
+    }
+
+    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
+    if (modeIndex !== -1 && currentMode) {
+      modes[modeIndex] = currentMode;
+    }
+
+    await saveModes();
+    
+    // 更新 filteredWords
+    if (typeof filteredWords[selectedItemIndex] === 'object' && 
+        filteredWords[selectedItemIndex].type === 'rich') {
+      filteredWords[selectedItemIndex].html = newHtml;
+    }
+    
+    // 更新 data-original 属性
+    richEditor.setAttribute('data-original', newHtml);
+    
+    updateHistoryList();
+    showStatus("笔记已自动保存");
+  }
+}
+
+// 处理富文本编辑器中的图片粘贴
+async function handleRichEditorImagePaste(richEditor, file) {
+  try {
+    const dataUrl = await compressImageForRichEditor(file);
+    
+    // 在编辑器中插入图片
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.margin = '10px 0';
+    img.style.borderRadius = '4px';
+    img.style.cursor = 'pointer';
+    
+    // 插入到光标位置
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      
+      const br1 = document.createElement('br');
+      const br2 = document.createElement('br');
+      
+      range.insertNode(br2);
+      range.insertNode(img);
+      range.insertNode(br1);
+      
+      range.setStartAfter(br2);
+      range.setEndAfter(br2);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      richEditor.appendChild(document.createElement('br'));
+      richEditor.appendChild(img);
+      richEditor.appendChild(document.createElement('br'));
+    }
+    
+    // 触发自动保存
+    richEditor.dispatchEvent(new Event('input'));
+    
+    showStatus('图片已插入');
+  } catch (error) {
+    console.error('处理图片失败:', error);
+    showStatus('图片处理失败');
+  }
+}
+
+// 压缩图片（用于富文本编辑器）
+function compressImageForRichEditor(file, maxWidth = 800, maxHeight = 800, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = e.target.result;
+    };
+    
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// 显示图片放大模态框
+function showImageModal(src) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+  `;
+  
+  const img = document.createElement('img');
+  img.src = src;
+  img.style.cssText = `
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+    border-radius: 8px;
+  `;
+  
+  modal.appendChild(img);
+  document.body.appendChild(modal);
+  
+  modal.addEventListener('click', () => {
+    document.body.removeChild(modal);
+  });
+}
+
 window.copyToClipboardFromPreview = async function() {
   if (selectedItemIndex === -1 || selectedItemIndex >= filteredWords.length) return;
   
@@ -827,8 +1164,18 @@ window.copyToClipboardFromPreview = async function() {
   
   try {
     if (normalized.type === 'text') {
-      await window.electronAPI.clipboard.writeText(normalized.content);
-      showStatus("已复制到剪贴板");
+      const isDataUrlImg = typeof normalized.content === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(normalized.content);
+      if (isDataUrlImg) {
+        const img = await window.electronAPI.clipboard.saveDataURL(normalized.content);
+        showStatus(img ? "图片已复制到剪贴板" : "复制失败");
+      } else {
+        await window.electronAPI.clipboard.writeText(normalized.content);
+        showStatus("已复制到剪贴板");
+      }
+    } else if (normalized.type === 'rich') {
+      const plain = htmlToPlain(normalized.html);
+      await window.electronAPI.clipboard.writeText(plain);
+      showStatus("已复制笔记文本到剪贴板");
     } else if (normalized.type === 'image') {
       await copyImageToClipboard();
     }

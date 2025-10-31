@@ -7,7 +7,9 @@ const fs = require('fs');
 const store = new Store();
 
 let mainWindow = null;
+let noteWindow = null; // 笔记窗口
 let lastShowAt = 0; // 记录最近一次显示时间，用于忽略刚显示时的 blur
+let lastNoteShowAt = 0; // 笔记窗口显示时间
 
 // 在当前活动 Space/全屏上显示，并跟随鼠标所在显示器
 async function showOnActiveSpace() {
@@ -105,6 +107,103 @@ function createWindow() {
   // 开发模式打开开发者工具
   // 临时启用以调试图片功能
   mainWindow.webContents.openDevTools();
+}
+
+// 创建笔记窗口
+function createNoteWindow() {
+  if (noteWindow) {
+    return; // 已存在，不重复创建
+  }
+
+  noteWindow = new BrowserWindow({
+    width: 700,
+    height: 600,
+    minWidth: 500,
+    minHeight: 400,
+    show: false,
+    frame: false,
+    resizable: true,
+    transparent: false,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    hasShadow: true,
+    roundedCorners: true,
+    backgroundColor: '#ffffff',
+    icon: path.join(__dirname, '单词.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'electron-preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      backgroundThrottling: false
+    }
+  });
+
+  // 加载笔记窗口页面
+  noteWindow.loadFile('note-window.html');
+
+  // 窗口关闭时隐藏
+  noteWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      noteWindow.hide();
+    }
+  });
+
+  // 失去焦点时隐藏
+  noteWindow.on('blur', () => {
+    const elapsed = Date.now() - lastNoteShowAt;
+    if (elapsed < 800) return;
+    
+    setTimeout(() => {
+      if (noteWindow && !noteWindow.isDestroyed() && !noteWindow.isFocused()) {
+        noteWindow.hide();
+      }
+    }, 200);
+  });
+
+  // 调试工具
+  // noteWindow.webContents.openDevTools();
+}
+
+// 显示笔记窗口
+async function showNoteWindow() {
+  if (!noteWindow) {
+    createNoteWindow();
+  }
+
+  // 获取鼠标位置
+  const cursorPoint = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(cursorPoint);
+  const workArea = display.workArea;
+
+  // 获取窗口尺寸
+  const { width: winW, height: winH } = noteWindow.getBounds();
+
+  // 右侧偏上位置
+  const targetX = Math.round(workArea.x + workArea.width - winW - 50);
+  const targetY = Math.round(workArea.y + 50);
+  noteWindow.setPosition(targetX, targetY);
+
+  // 临时在所有工作区可见
+  try {
+    noteWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  } catch (_) {}
+
+  try {
+    noteWindow.setAlwaysOnTop(true, 'floating');
+  } catch (_) {}
+
+  noteWindow.show();
+  noteWindow.focus();
+  lastNoteShowAt = Date.now();
+
+  // 200ms后还原
+  setTimeout(() => {
+    try {
+      noteWindow.setVisibleOnAllWorkspaces(false);
+    } catch (_) {}
+  }, 200);
 }
 
 // 快速保存（不显示窗口，只显示通知）
@@ -302,13 +401,24 @@ app.whenReady().then(() => {
     quickSave();
   });
 
-  if (!ret1 || !ret2) {
+  // 注册快捷键：Command+M - 呼出笔记窗口
+  const noteShortcut = process.platform === 'darwin' ? 'Command+M' : 'Ctrl+M';
+  const ret3 = globalShortcut.register(noteShortcut, () => {
+    if (noteWindow && noteWindow.isVisible()) {
+      noteWindow.hide();
+    } else {
+      showNoteWindow();
+    }
+  });
+
+  if (!ret1 || !ret2 || !ret3) {
     console.error('快捷键注册失败');
   }
 
   console.log(`✓ 已注册快捷键:`);
-  console.log(`  - ${toggleShortcut}: 呼出/隐藏窗口`);
+  console.log(`  - ${toggleShortcut}: 呼出/隐藏主窗口`);
   console.log(`  - ${saveShortcut}: 快速保存（不显示窗口）`);
+  console.log(`  - ${noteShortcut}: 呼出/隐藏笔记窗口`);
 });
 
 // 所有窗口关闭时退出（macOS 除外）
@@ -528,6 +638,51 @@ ipcMain.handle('clipboard-write-image', async (event, imagePath) => {
   } catch (error) {
     console.error('复制图片失败:', error);
     return false;
+  }
+});
+
+// 将 dataURL 转存为图片文件并写入剪贴板
+ipcMain.handle('clipboard-save-dataurl', async (event, dataUrl) => {
+  try {
+    if (!dataUrl || typeof dataUrl !== 'string') return null;
+    const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,(.+)$/i);
+    if (!match) return null;
+    const base64 = match[2];
+    const buffer = Buffer.from(base64, 'base64');
+
+    // 统一转为 PNG 保存
+    const img = nativeImage.createFromBuffer(buffer);
+    if (img.isEmpty()) return null;
+    const size = img.getSize();
+    const timestamp = Date.now();
+    const fileName = `image_${timestamp}.png`;
+    const thumbFileName = `image_thumb_${timestamp}.png`;
+    const imagesDir = getImagesDir();
+    const imagePath = path.join(imagesDir, fileName);
+    const thumbPath = path.join(imagesDir, thumbFileName);
+
+    const pngBuffer = img.toPNG();
+    fs.writeFileSync(imagePath, pngBuffer);
+    const thumbnail = img.resize({ width: 48, height: 48 });
+    const thumbBuffer = thumbnail.toPNG();
+    fs.writeFileSync(thumbPath, thumbBuffer);
+
+    // 写入系统剪贴板为图片
+    clipboard.writeImage(img);
+
+    return {
+      type: 'image',
+      fileName,
+      thumbFileName,
+      width: size.width,
+      height: size.height,
+      size: pngBuffer.length,
+      path: imagePath,
+      dataURL: `data:image/png;base64,${pngBuffer.toString('base64')}`
+    };
+  } catch (error) {
+    console.error('保存 dataURL 图片失败:', error);
+    return null;
   }
 });
 

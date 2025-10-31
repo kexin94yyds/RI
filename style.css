@@ -484,6 +484,32 @@ body {
   outline: none;
 }
 
+/* 富文本编辑器样式 */
+.preview-rich-editor {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.preview-rich-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #aaa;
+  pointer-events: none;
+}
+
+.preview-rich-editor img {
+  max-width: 100%;
+  height: auto;
+  margin: 10px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.preview-rich-editor:focus {
+  outline: none;
+}
+
 /* 图片预览样式 */
 .preview-image-container {
   flex: 1;
