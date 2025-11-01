@@ -1,13 +1,13 @@
 {
-  "name": "word-recorder-electron",
+  "name": "replace-information",
   "version": "2.1.0",
-  "description": "单词记录器 - Electron 桌面版",
+  "description": "Replace-Information - 信息置换工具",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --enable-logging"
   },
-  "keywords": ["electron", "word", "recorder"],
+  "keywords": ["electron", "replace", "information", "clipboard"],
   "author": "",
   "license": "ISC",
   "devDependencies": {
