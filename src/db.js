@@ -2,7 +2,7 @@
 // 参考 insidebar-ai 的成熟实现
 
 const DB_NAME = 'RIDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2: add 'order' field/index for modes
 const MODES_STORE = 'modes';
 const NOTES_STORE = 'notes';
 const WORDS_STORE = 'words';
@@ -70,6 +70,17 @@ export async function initDB() {
         });
         modesStore.createIndex('name', 'name', { unique: false });
         modesStore.createIndex('createdAt', 'createdAt', { unique: false });
+        // v2: 排序索引
+        try { modesStore.createIndex('order', 'order', { unique: false }); } catch (_) {}
+      } else if (event.oldVersion < 2) {
+        // v2 升级：为已存在的 store 添加索引
+        try {
+          const tx = event.currentTarget.transaction; // versionchange 事务
+          const store = tx.objectStore(MODES_STORE);
+          if (!store.indexNames || !store.indexNames.contains('order')) {
+            store.createIndex('order', 'order', { unique: false });
+          }
+        } catch (_) { /* 忽略 */ }
       }
 
       // 创建 notes 表（存储富文本笔记）
@@ -107,7 +118,19 @@ export async function getAllModes() {
     const transaction = db.transaction([MODES_STORE], 'readonly');
     const store = transaction.objectStore(MODES_STORE);
     const request = store.getAll();
-    return wrapRequest(request, value => value || []);
+    return wrapRequest(request, value => {
+      const arr = value || [];
+      // 统一排序：按 order 升序，其次 createdAt 升序
+      arr.sort((a, b) => {
+        const ao = (typeof a.order === 'number') ? a.order : Number.MAX_SAFE_INTEGER;
+        const bo = (typeof b.order === 'number') ? b.order : Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        const ac = a.createdAt || 0; const bc = b.createdAt || 0;
+        if (ac !== bc) return ac - bc;
+        return (a.id || 0) - (b.id || 0);
+      });
+      return arr;
+    });
   });
 }
 
@@ -126,6 +149,8 @@ export async function saveMode(modeData) {
   await ensureDb();
 
   const mode = {
+    // v2: 支持传入 order 用于固定显示顺序
+    order: (modeData && typeof modeData.order === 'number') ? modeData.order : undefined,
     name: sanitizeString(modeData.name || '新模式', MAX_NAME_LENGTH),
     notes: sanitizeString(modeData.notes || '', MAX_NOTES_LENGTH),
     createdAt: modeData.createdAt || Date.now(),
@@ -138,6 +163,31 @@ export async function saveMode(modeData) {
     const request = store.add(mode);
     return wrapRequest(request, resolveValue => ({ ...mode, id: resolveValue }));
   });
+}
+
+// v2: 批量更新模式的顺序
+export async function updateModesOrder(orderList) {
+  await ensureDb();
+  if (!Array.isArray(orderList) || orderList.length === 0) return [];
+  return runWithRetry(() => new Promise((resolve, reject) => {
+    const tx = db.transaction([MODES_STORE], 'readwrite');
+    const store = tx.objectStore(MODES_STORE);
+    let done = 0, total = orderList.length;
+    const results = [];
+    orderList.forEach(({ id, order }) => {
+      const getReq = store.get(id);
+      getReq.onsuccess = () => {
+        const rec = getReq.result;
+        if (!rec) { done++; if (done === total) resolve(results); return; }
+        rec.order = order;
+        rec.updatedAt = Date.now();
+        const putReq = store.put(rec);
+        putReq.onsuccess = () => { results.push(rec); done++; if (done === total) resolve(results); };
+        putReq.onerror = () => { done++; if (done === total) resolve(results); };
+      };
+      getReq.onerror = () => { done++; if (done === total) resolve(results); };
+    });
+  }));
 }
 
 export async function updateMode(id, updates) {
@@ -434,4 +484,3 @@ function wrapRequest(request, mapper) {
 
 // 初始化数据库
 initDB().catch(console.error);
-

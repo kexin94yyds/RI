@@ -9,7 +9,8 @@ import {
   getWordsByMode, 
   saveWord as saveW, 
   deleteWord, 
-  clearAllWords as clearWords 
+  clearAllWords as clearWords,
+  updateModesOrder
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
 
@@ -296,6 +297,12 @@ async function loadModes() {
   try {
     // 从 IndexedDB 加载所有模式
     modes = await getAllModes();
+    // v2: 如果老数据没有 order 字段，按当前顺序写回默认顺序，确保下次仍保持
+    if (modes && modes.length > 0 && modes.some(m => typeof m.order !== 'number')) {
+      const orderList = modes.map((m, idx) => ({ id: m.id, order: idx }));
+      try { await updateModesOrder(orderList); } catch (_) {}
+      modes = await getAllModes();
+    }
     
     if (modes.length === 0) {
       console.warn('没有找到模式');
@@ -323,7 +330,9 @@ async function loadModes() {
 
 async function saveModes() {
   // IndexedDB 会自动保存，这里主要是通知其他窗口
-  if (currentMode && currentModeId) {
+  if (currentMode) {
+    // 始终以当前模式为准持久化 ID，避免因变量未同步导致恢复到错误的模式
+    currentModeId = currentMode.id;
     await window.electronAPI.store.set('currentModeId', currentModeId);
   }
   
@@ -501,8 +510,8 @@ function handleDrop(e) {
   const rect = button.getBoundingClientRect();
   const before = (e.clientY - rect.top) < rect.height / 2;
   
-  const fromIdx = modes.findIndex(m => m.id === __dragModeId);
-  const toIdxBase = modes.findIndex(m => m.id === targetModeId);
+  const fromIdx = modes.findIndex(m => String(m.id) === String(__dragModeId));
+  const toIdxBase = modes.findIndex(m => String(m.id) === String(targetModeId));
   
   if (fromIdx === -1 || toIdxBase === -1) return;
   
@@ -622,8 +631,8 @@ function startModeMouseDrag(ev, button, modeId) {
     if (!wasActive) return; // 只是点击，不是拖拽
     __mouseDrag.justDropped = true; // 抑制紧随其后的 click
     if (!dragId || !targetId || dragId === targetId) return;
-    const fromIdx = modes.findIndex(m => m.id === dragId);
-    const toIdxBase = modes.findIndex(m => m.id === targetId);
+    const fromIdx = modes.findIndex(m => String(m.id) === String(dragId));
+    const toIdxBase = modes.findIndex(m => String(m.id) === String(targetId));
     if (fromIdx === -1 || toIdxBase === -1) return;
     let insertIdx = before ? toIdxBase : toIdxBase + 1;
     if (fromIdx < insertIdx) insertIdx -= 1;
@@ -733,7 +742,7 @@ function clearInsertClasses() {
 
 async function moveModeToIndex(modeId, targetIdx) {
   const currentOrder = modes.slice();
-  const fromIdx = currentOrder.findIndex(m => m.id === modeId);
+  const fromIdx = currentOrder.findIndex(m => String(m.id) === String(modeId));
   
   if (fromIdx === -1) return;
   
@@ -747,7 +756,11 @@ async function moveModeToIndex(modeId, targetIdx) {
   
   // 更新全局 modes
   modes = currentOrder;
-  
+  // 持久化顺序（按当前数组顺序写入 order）
+  try {
+    const orderList = modes.map((m, idx) => ({ id: m.id, order: idx }));
+    await updateModesOrder(orderList);
+  } catch (_) {}
   // 保存并重新渲染
   await saveModes();
   updateModeSidebar();
@@ -834,6 +847,9 @@ function hideContextMenu() {
 async function switchToMode(mode) {
   isAllHistoryMode = false;
   currentMode = mode;
+  // 立刻同步并持久化当前模式 ID，避免窗口获得焦点后恢复到旧模式
+  currentModeId = mode.id;
+  try { await window.electronAPI.store.set('currentModeId', currentModeId); } catch (_) {}
   await saveModes();
   updateModeSidebar();
   clearSearch();
@@ -1009,13 +1025,8 @@ async function saveMode() {
       alert("模式名称已存在");
       return;
     }
-
-    const newMode = {
-      id: Date.now().toString(),
-      name: name,
-      words: [],
-    };
-
+    // 新建模式并持久化，order 追加到末尾
+    const newMode = await saveM({ name, order: modes.length });
     modes.push(newMode);
     currentMode = newMode;
     showStatus(`已添加模式：${name}`);
@@ -1064,6 +1075,11 @@ async function deleteMode(mode) {
     currentModeId = currentMode.id;
   }
 
+  // 重新分配顺序并持久化
+  try {
+    const orderList = modes.map((m, idx) => ({ id: m.id, order: idx }));
+    await updateModesOrder(orderList);
+  } catch (_) {}
   updateModeSidebar();
   selectedItemIndex = -1;
   updateHistoryList();
@@ -1324,6 +1340,13 @@ function createHistoryItem(word, index) {
     selectedItemIndex = index;
     updateHistoryList();
     updatePreview();
+    // 将焦点设置到新创建的对应项目上，这样方向键可以继续工作
+    setTimeout(() => {
+      const newItem = document.querySelector(`.history-item[data-index="${index}"]`);
+      if (newItem) {
+        newItem.focus();
+      }
+    }, 0);
   });
 
   // 双击进入编辑模式（仅文本）
@@ -2169,14 +2192,14 @@ async function clearCurrentModeInDialog() {
 // 确定导入（直接导入文本框中的内容）
 async function confirmImport() {
   const textEl = document.getElementById("import-text");
-  const text = textEl?.value.trim() || "";
+    const text = textEl?.value.trim() || "";
   
-  if (!text) {
+    if (!text) {
     alert("请先输入或粘贴要导入的内容");
-    return;
-  }
+      return;
+    }
 
-  await importWords(text);
+    await importWords(text);
 }
 
 function handleFileImport(e) {
@@ -2194,7 +2217,7 @@ function handleFileImport(e) {
 
 async function importWords(text) {
   if (!currentMode) return;
-  
+
   // 保存当前模式ID，防止在alert触发focus事件时被改变
   const targetModeId = currentMode.id;
   const targetModeName = currentMode.name;
@@ -2319,6 +2342,40 @@ function handleKeyboardNavigation(e) {
     if (e.key === "Escape") {
       e.target.blur();
     }
+    return;
+  }
+
+  // 在非输入/编辑区域中，确保方向键可以始终用于列表导航。
+  // 注意：如果焦点本身在 .history-item 上，则交给该元素自身的 keydown 处理，避免重复触发。
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    // 若事件源位于历史项或搜索框内，直接返回，避免与各自的 keydown 叠加
+    if (e.target && (
+      e.target.id === 'search-input' ||
+      (typeof e.target.closest === 'function' && e.target.closest('.history-item'))
+    )) {
+      return;
+    }
+
+    if (!filteredWords || filteredWords.length === 0) return;
+    e.preventDefault();
+
+    if (e.key === 'ArrowDown') {
+      if (selectedItemIndex === -1) {
+        selectedItemIndex = 0;
+      } else if (selectedItemIndex < filteredWords.length - 1) {
+        selectedItemIndex++;
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (selectedItemIndex === -1) {
+        selectedItemIndex = filteredWords.length - 1;
+      } else if (selectedItemIndex > 0) {
+        selectedItemIndex--;
+      }
+    }
+
+    updateHistoryList();
+    updatePreview();
+    scrollToSelectedItem();
     return;
   }
   
