@@ -1200,6 +1200,13 @@ async function updateHistoryList() {
     words = await getWordsByMode(currentMode.id) || [];
   }
   
+  // 按创建时间降序排序（最新的在上面）
+  words.sort((a, b) => {
+    const timeA = a.createdAt || 0;
+    const timeB = b.createdAt || 0;
+    return timeB - timeA; // 降序：新的在前
+  });
+  
   // 过滤搜索结果
   filteredWords = searchQuery 
     ? words.filter(word => {
