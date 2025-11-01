@@ -42,3 +42,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform
 });
 
+// 暴露额外的 electron API 用于 IPC 通信
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: {
+    send: (channel, data) => {
+      // 白名单允许的频道
+      const validChannels = ['toggle-note-pin'];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.send(channel, data);
+      }
+    },
+    on: (channel, func) => {
+      const validChannels = ['note-pin-changed'];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.on(channel, (event, ...args) => func(...args));
+      }
+    }
+  }
+});
+

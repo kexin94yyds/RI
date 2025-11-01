@@ -108,36 +108,22 @@
       transform: scale(1.1);
     }
 
-    /* 清理缓存按钮 - 黄色 */
-    .md-clear-cache {
-      background-color: #FFD60A;
+    /* 置顶按钮 - 橙色 */
+    .md-pin {
+      background-color: #FF9500;
     }
 
-    .md-clear-cache:hover {
-      background-color: #FFC700;
-      color: #4c0000;
+    .md-pin:hover {
+      background-color: #FF8C00;
       transform: scale(1.1);
     }
 
-    /* 分享按钮 - 绿色 */
-    .md-share {
-      background-color: #34C759;
+    .md-pin.pinned {
+      background-color: #FF3B30;
     }
 
-    .md-share:hover {
-      background-color: #28A745;
-      color: #ffffff;
-      transform: scale(1.1);
-    }
-
-    /* 一键复制按钮 - 紫色 */
-    .md-quick-copy {
-      background-color: #AF52DE;
-    }
-
-    .md-quick-copy:hover {
-      background-color: #9A3FCD;
-      color: #ffffff;
+    .md-pin.pinned:hover {
+      background-color: #FF2D20;
       transform: scale(1.1);
     }
 
@@ -296,9 +282,7 @@
       <div class="button-container">
         <button class="macos-btn md-close" id="close-btn" title="关闭">✕</button>
         <button class="macos-btn md-export" id="export-btn" title="导出为Markdown">⬆</button>
-        <button class="macos-btn md-clear-cache" id="cache-btn" title="存储状态">🗑</button>
-        <button class="macos-btn md-share" id="share-btn" title="分享笔记">↗</button>
-        <button class="macos-btn md-quick-copy" id="copy-btn" title="一键复制">📋</button>
+        <button class="macos-btn md-pin" id="pin-btn" title="置顶窗口">📌</button>
       </div>
 
       <!-- 标题 -->

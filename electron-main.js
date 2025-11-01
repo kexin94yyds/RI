@@ -124,7 +124,7 @@ function createNoteWindow() {
     frame: false,
     resizable: true,
     transparent: false,
-    alwaysOnTop: true,
+    alwaysOnTop: false, // 默认不置顶，由用户通过按钮控制
     skipTaskbar: false,
     hasShadow: true,
     roundedCorners: true,
@@ -150,14 +150,17 @@ function createNoteWindow() {
     }
   });
 
-  // 失去焦点时隐藏
+  // 失去焦点时隐藏（仅当未置顶时）
   noteWindow.on('blur', () => {
     const elapsed = Date.now() - lastNoteShowAt;
     if (elapsed < 800) return;
     
     setTimeout(() => {
       if (noteWindow && !noteWindow.isDestroyed() && !noteWindow.isFocused()) {
-        noteWindow.hide();
+        // 如果窗口已置顶，则不自动隐藏
+        if (!noteWindow.isAlwaysOnTop()) {
+          noteWindow.hide();
+        }
       }
     }, 200);
   });
@@ -367,7 +370,8 @@ function showNotification(title, body) {
     new Notification({
       title: title,
       body: body,
-      silent: false
+      silent: false,
+      icon: path.join(__dirname, '信息置换.png')
     }).show();
   }
 }
@@ -733,5 +737,13 @@ ipcMain.handle('window-toggle', async () => {
     } else {
       await showOnActiveSpace();
     }
+  }
+});
+
+// IPC 处理：笔记窗口置顶控制
+ipcMain.on('toggle-note-pin', (event, isPinned) => {
+  if (noteWindow) {
+    noteWindow.setAlwaysOnTop(isPinned, 'floating');
+    console.log(`笔记窗口置顶状态: ${isPinned ? '已置顶' : '已取消置顶'}`);
   }
 });

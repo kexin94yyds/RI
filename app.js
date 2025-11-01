@@ -396,11 +396,11 @@ async function saveMode() {
 
 async function deleteMode(mode) {
   if (modes.length <= 1) {
-    alert("至少需要保留一个模式");
+    showStatus("至少需要保留一个模式");
     return;
   }
 
-  if (!confirm(`确定要删除模式"${mode.name}"吗？`)) {
+  if (!confirm(`确定要删除模式"${mode.name}"吗？所有内容将被删除`)) {
     return;
   }
 
@@ -416,6 +416,7 @@ async function deleteMode(mode) {
   selectedItemIndex = -1;
   updateHistoryList();
   updatePreview();
+  showStatus(`已删除模式"${mode.name}"`);
 }
 
 // ==================== 搜索功能 ====================
@@ -436,6 +437,13 @@ function handleSearch(e) {
 }
 
 function handleSearchKeyDown(e) {
+  // 对于删除快捷键，阻止默认行为但让事件冒泡到全局监听器
+  if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+    e.preventDefault(); // 阻止删除搜索框文本
+    // 不调用 stopPropagation()，让事件继续冒泡
+    return;
+  }
+  
   if (e.key === "Escape") {
     clearSearch();
   } else if (e.key === "ArrowDown") {
@@ -804,13 +812,15 @@ function updatePreview() {
         if (e.key === 'Escape') {
           e.preventDefault();
           richEditor.blur();
+          return;
         }
         // Tab 键插入空格
         if (e.key === 'Tab') {
           e.preventDefault();
           document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+          return;
         }
-        e.stopPropagation();
+        // 移除 stopPropagation，让全局监听器正确识别 contentEditable 状态
       });
       
       // 图片粘贴支持
@@ -882,6 +892,7 @@ function updatePreview() {
         if (e.key === 'Escape') {
           e.preventDefault();
           textarea.blur(); // 失去焦点会触发保存
+          return;
         }
         // Cmd+Enter 打开链接
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -894,8 +905,7 @@ function updatePreview() {
           }
           return;
         }
-        // 阻止事件冒泡，避免触发其他快捷键
-        e.stopPropagation();
+        // 移除 stopPropagation，让全局监听器正确识别 TEXTAREA 状态
       });
     }
   }
@@ -1230,14 +1240,13 @@ window.deleteCurrentItem = async function() {
   if (selectedItemIndex === -1 || selectedItemIndex >= filteredWords.length) return;
   
   if (isAllHistoryMode) {
-    alert("在全局历史记录模式下无法删除，请切换到具体模式");
+    showStatus("在全局历史记录模式下无法删除");
     return;
   }
   
   const word = filteredWords[selectedItemIndex];
-  if (confirm(`确定要删除这个内容吗？`)) {
-    await deleteContentItem(word);
-  }
+  await deleteContentItem(word);
+  showStatus("已删除");
 };
 
 async function deleteContentItem(word) {
@@ -1608,8 +1617,40 @@ async function openURL(url) {
 // ==================== 键盘导航 ====================
 
 function handleKeyboardNavigation(e) {
-  // 如果在输入框中，不处理
-  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+  // 检查是否在可编辑元素中
+  const isInEditableElement = e.target.isContentEditable || 
+                               e.target.tagName === "TEXTAREA" ||
+                               (e.target.tagName === "INPUT" && e.target.id !== "search-input");
+  
+  // 在可编辑元素中，只处理 Escape 键
+  if (isInEditableElement) {
+    if (e.key === "Escape") {
+      e.target.blur();
+    }
+    return;
+  }
+  
+  // 对于搜索框，只处理删除快捷键（已在 handleSearchKeyDown 中处理）
+  // 其他快捷键不处理，让搜索框正常工作
+  if (e.target.id === "search-input") {
+    // 删除快捷键会从搜索框冒泡上来
+    if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+      if (selectedItemIndex !== -1 && selectedItemIndex < filteredWords.length) {
+        e.preventDefault();
+        window.deleteCurrentItem();
+      }
+      return;
+    }
+    // 其他键不处理，让搜索功能正常工作
+    return;
+  }
+  
+  // Cmd+Delete (Mac) 或 Ctrl+Delete (Windows/Linux) 删除选中项
+  if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+    if (selectedItemIndex !== -1 && selectedItemIndex < filteredWords.length) {
+      e.preventDefault();
+      window.deleteCurrentItem();
+    }
     return;
   }
 
@@ -1622,8 +1663,8 @@ function handleKeyboardNavigation(e) {
   
   // Cmd+Enter (Mac) 或 Ctrl+Enter (Windows/Linux) 打开链接
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-    e.preventDefault();
     if (selectedItemIndex !== -1 && selectedItemIndex < filteredWords.length) {
+      e.preventDefault();
       const word = filteredWords[selectedItemIndex];
       const normalized = (typeof word === 'string') ? { type: 'text', content: word } : word;
       
@@ -1632,14 +1673,6 @@ function handleKeyboardNavigation(e) {
       } else {
         showStatus('当前选中的内容不是链接');
       }
-    }
-  }
-  
-  // Cmd+Delete (Mac) 或 Ctrl+Delete (Windows/Linux) 删除选中项
-  if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
-    e.preventDefault();
-    if (selectedItemIndex !== -1 && selectedItemIndex < filteredWords.length) {
-      window.deleteCurrentItem();
     }
   }
 }

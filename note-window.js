@@ -185,9 +185,7 @@ function setupEventListeners() {
   // 按钮事件
   document.getElementById('close-btn').addEventListener('click', closeWindow);
   document.getElementById('export-btn').addEventListener('click', exportMarkdown);
-  document.getElementById('cache-btn').addEventListener('click', showStorageStatus);
-  document.getElementById('share-btn').addEventListener('click', shareNote);
-  document.getElementById('copy-btn').addEventListener('click', quickCopyAllContent);
+  document.getElementById('pin-btn').addEventListener('click', togglePinWindow);
   
   // 模式切换器
   document.getElementById('mode-switcher-btn').addEventListener('click', (e) => {
@@ -282,6 +280,26 @@ function handleEditorClick(e) {
 // 关闭窗口
 function closeWindow() {
   window.electronAPI.window.hide();
+}
+
+// 置顶窗口切换
+let isPinned = false;
+function togglePinWindow() {
+  isPinned = !isPinned;
+  const pinBtn = document.getElementById('pin-btn');
+  
+  if (isPinned) {
+    pinBtn.classList.add('pinned');
+    pinBtn.title = '取消置顶';
+  } else {
+    pinBtn.classList.remove('pinned');
+    pinBtn.title = '置顶窗口';
+  }
+  
+  // 发送消息给主进程
+  if (window.electron && window.electron.ipcRenderer) {
+    window.electron.ipcRenderer.send('toggle-note-pin', isPinned);
+  }
 }
 
 // 导出 Markdown - 直接复制到剪贴板
