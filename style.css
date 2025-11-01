@@ -5,25 +5,12 @@
   padding: 0;
 }
 
-/* 拖拽区域 */
-.titlebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  -webkit-app-region: drag;
-  z-index: 9999;
-  background: transparent;
-}
-
 body {
   font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
   width: 100%;
   height: 100vh;
   margin: 0;
   padding: 0;
-  padding-top: 40px;
   background: rgba(245, 247, 250, 0.95);
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -34,7 +21,7 @@ body {
 /* ==================== 主容器 - 三栏布局 ==================== */
 .app-container {
   display: flex;
-  height: calc(100vh - 40px);
+  height: 100vh;
   width: 100%;
   -webkit-app-region: no-drag;
 }
@@ -79,7 +66,7 @@ body {
   color: #333;
   text-align: center;
   position: relative;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   -webkit-app-region: no-drag;
 }
 
@@ -111,37 +98,38 @@ body.no-select, body.no-select * {
 
 .sidebar-item:hover {
   background: #f5f5f5;
-  border-color: #333;
-  transform: none;
-  box-shadow: none;
+  border-color: #999;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
   color: #000;
 }
 
 .sidebar-item.active {
-  background: #000;
-  color: white;
-  border-color: #000;
-  box-shadow: none;
+  background: #f5f5f5;
+  color: #000;
+  border-color: #000 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  font-weight: 600;
 }
 
 .sidebar-item.all-history {
   background: white;
-  border: 1px solid #333;
+  border: 1px solid #e0e0e0;
   color: #333;
   font-weight: 600;
 }
 
 .sidebar-item.all-history:hover {
   background: #f5f5f5;
-  border-color: #000;
+  border-color: #999;
   color: #000;
 }
 
 .sidebar-item.all-history.active {
-  background: #000;
-  color: white;
-  border-color: #000;
-  box-shadow: none;
+  background: #f5f5f5;
+  color: #000;
+  border-color: #000 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }
 
 .sidebar-item.add-mode {
@@ -344,20 +332,23 @@ body.no-select, body.no-select * {
 .clipboard-save-btn {
   width: 100%;
   padding: 8px;
-  border: 1px solid #333;
+  border: 1px solid #333 !important;
   border-radius: 4px;
-  background: #000;
-  color: white;
+  background: white !important;
+  color: #333 !important;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 
 .clipboard-save-btn:hover {
-  background: #333;
-  box-shadow: none;
-  transform: none;
+  background: #f5f5f5 !important;
+  border-color: #000 !important;
+  color: #000 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(-1px);
 }
 
 /* 历史记录列表区 */
@@ -485,12 +476,17 @@ body.no-select, body.no-select * {
 .preview-actions {
   display: flex;
   gap: 8px;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  justify-content: flex-end;
+  -webkit-app-region: drag; /* 整个区域可拖拽 */
 }
 
 .action-btn {
   padding: 8px 16px;
   border: 1px solid #e0e0e0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: white;
   font-size: 13px;
   font-weight: 500;
@@ -498,13 +494,20 @@ body.no-select, body.no-select * {
   transition: all 0.2s;
   white-space: nowrap;
   color: #333;
+  -webkit-app-region: no-drag;
 }
 
 .action-btn:hover {
   background: #f5f5f5;
   border-color: #333;
-  transform: none;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   color: #000;
+}
+
+.action-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .preview-content-area {
@@ -662,14 +665,17 @@ body.no-select, body.no-select * {
 }
 
 .preview-btn.primary {
-  background: #000;
-  color: white;
-  border-color: #000;
+  background: white;
+  color: #333;
+  border-color: #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .preview-btn.primary:hover {
-  background: #333;
-  box-shadow: none;
+  background: #f5f5f5;
+  border-color: #000;
+  color: #000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .preview-btn.danger {
@@ -892,15 +898,18 @@ body.no-select, body.no-select * {
 }
 
 .btn-primary {
-  background: #000;
-  color: white;
-  border: 1px solid #000;
+  background: white;
+  color: #333;
+  border: 1px solid #333;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover {
-  background: #333;
-  box-shadow: none;
-  transform: none;
+  background: #f5f5f5;
+  border-color: #000;
+  color: #000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {

@@ -152,9 +152,9 @@
 
     .mode-switcher-btn {
       padding: 3px 10px;
-      background-color: #ff9800;
-      color: white;
-      border: none;
+      background-color: white;
+      color: #333;
+      border: 1px solid #333;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 500;
@@ -164,10 +164,14 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
     .mode-switcher-btn:hover {
-      background-color: #f57c00;
+      background-color: #f5f5f5;
+      border-color: #000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
     }
 
     .mode-dropdown {
@@ -192,20 +196,27 @@
       justify-content: space-between;
       align-items: center;
       font-size: 12px;
-      transition: background 0.2s;
+      transition: all 0.2s;
+      margin: 4px;
+      border-radius: 4px;
+      border: 1px solid transparent;
     }
 
     .mode-item:hover {
       background-color: #f5f5f5;
+      border-color: #999;
     }
 
     .mode-item.active {
-      background-color: #e3f2fd;
-      color: #007AFF;
+      background-color: #f5f5f5;
+      color: #000;
+      border-color: #000;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      font-weight: 600;
     }
 
     .check-mark {
-      color: #007AFF;
+      color: #000;
       font-weight: bold;
     }
 
@@ -241,12 +252,13 @@
       top: 50px;
       left: 50%;
       transform: translateX(-50%);
-      background: #34C759;
+      background: #000;
       color: white;
       padding: 12px 24px;
-      border-radius: 8px;
+      border-radius: 4px;
       font-size: 14px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border: 1px solid #333;
       z-index: 10000;
       animation: slideIn 0.3s ease-out;
     }

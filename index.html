@@ -7,9 +7,6 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- 拖拽区域 -->
-  <div class="titlebar"></div>
-  
   <!-- 主容器：三栏布局 -->
   <div class="app-container">
     <!-- 左侧边栏：模式列表 -->
@@ -59,6 +56,12 @@
 
     <!-- 右侧内容预览/详情区 -->
     <div class="preview-panel">
+      <!-- 顶部操作按钮 -->
+      <div class="preview-actions">
+        <button id="import-btn" class="action-btn" title="导入内容">导入</button>
+        <button id="export-btn" class="action-btn" title="导出为TXT">导出</button>
+      </div>
+      
       <!-- 预览内容区 -->
       <div class="preview-content-area">
         <div id="preview-content" class="preview-content">
@@ -70,8 +73,6 @@
       
       <!-- 隐藏的按钮，用于保持功能但不显示 -->
       <div style="display: none;">
-        <button id="export-btn"></button>
-        <button id="import-btn"></button>
         <button id="review-btn"></button>
         <button id="clear-all-btn"></button>
         <div id="save-status"></div>
@@ -124,7 +125,10 @@
         <button id="close-import-dialog" class="close-btn">✕</button>
       </div>
       <div class="modal-body">
-        <textarea id="import-text" class="import-textarea" placeholder="粘贴内容列表，每行一个..." rows="8"></textarea>
+        <div class="import-hint" style="font-size: 12px; color: #666; margin-bottom: 8px;">
+          💡 按空行分隔不同的内容项（一个空行表示一项内容的结束）
+        </div>
+        <textarea id="import-text" class="import-textarea" placeholder="粘贴内容列表，用空行分隔每个项目..." rows="8"></textarea>
         <div class="modal-buttons">
           <button id="paste-import-btn" class="btn-secondary">粘贴并导入</button>
           <input type="file" id="file-input" accept=".txt" style="display:none;">

@@ -1971,7 +1971,15 @@ async function exportTXT() {
     return;
   }
 
-  const txt = words.join("\n");
+  // 用空行分隔每个项目（与导入格式一致）
+  const txt = words.map(word => {
+    // 如果是对象格式（包含type和content），提取内容
+    if (typeof word === 'object' && word.content) {
+      return word.content;
+    }
+    return word;
+  }).join("\n\n");  // 用空行分隔
+  
   const filename = `${currentMode.name}_记录.txt`;
 
   const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
@@ -2048,8 +2056,11 @@ function handleFileImport(e) {
 async function importWords(text) {
   if (!currentMode) return;
 
-  const newWords = text
-    .split("\n")
+  // 按空行分隔内容（连续的换行符）
+  // 先统一换行符格式，然后按两个或更多换行符分隔
+  const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const newWords = normalizedText
+    .split(/\n\s*\n+/)  // 按空行（一个或多个连续换行）分隔
     .map((word) => word.trim())
     .filter((word) => word.length > 0);
 
