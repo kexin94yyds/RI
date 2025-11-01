@@ -219,6 +219,14 @@ async function loadModes() {
 async function saveModes() {
   await window.electronAPI.store.set("wordModes", modes);
   await window.electronAPI.store.set("currentWordMode", currentMode);
+  
+  // 通知笔记窗口模式已更新
+  if (window.electron && window.electron.ipcRenderer) {
+    window.electron.ipcRenderer.send('modes-updated', {
+      modes: modes,
+      currentMode: currentMode
+    });
+  }
 }
 
 function updateModeSidebar() {
@@ -726,6 +734,14 @@ async function switchToMode(mode) {
   updateHistoryList();
   updatePreview();
   showStatus(`已切换到模式：${mode.name}`);
+  
+  // 通知笔记窗口切换模式
+  if (window.electron && window.electron.ipcRenderer) {
+    window.electron.ipcRenderer.send('mode-switched', {
+      mode: currentMode
+    });
+  }
+  
   // 焦点回到搜索框
   setTimeout(() => {
     document.getElementById("search-input")?.focus();

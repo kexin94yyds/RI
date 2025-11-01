@@ -201,6 +201,46 @@ function setupEventListeners() {
       dropdown.style.display = 'none';
     }
   });
+  
+  // 监听主窗口的模式更新事件（IPC）
+  if (window.electron && window.electron.ipcRenderer) {
+    // 监听模式列表更新
+    window.electron.ipcRenderer.on('modes-sync', (data) => {
+      console.log('📝 笔记窗口收到模式列表更新:', data);
+      modes = data.modes || [];
+      if (data.currentMode) {
+        // 查找对应的模式对象
+        const updatedMode = modes.find(m => m.id === data.currentMode.id);
+        if (updatedMode) {
+          currentMode = updatedMode;
+          // 重新加载当前模式的笔记内容
+          loadNoteContent();
+        }
+      }
+      updateModeSwitcherDisplay();
+      updateTitle();
+      showNotification('✓ 模式列表已同步', true);
+    });
+    
+    // 监听当前模式切换
+    window.electron.ipcRenderer.on('mode-changed', (data) => {
+      console.log('📝 笔记窗口收到模式切换通知:', data);
+      if (data.mode) {
+        // 查找对应的模式对象
+        const newMode = modes.find(m => m.id === data.mode.id);
+        if (newMode) {
+          currentMode = newMode;
+          // 加载新模式的笔记内容
+          loadNoteContent();
+          updateModeSwitcherDisplay();
+          updateTitle();
+          showNotification(`✓ 已切换到: ${data.mode.name}`, true);
+        }
+      }
+    });
+    
+    console.log('✓ 笔记窗口模式同步监听器已设置');
+  }
 }
 
 // ==================== 编辑器事件处理 ====================

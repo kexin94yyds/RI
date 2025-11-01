@@ -747,3 +747,21 @@ ipcMain.on('toggle-note-pin', (event, isPinned) => {
     console.log(`笔记窗口置顶状态: ${isPinned ? '已置顶' : '已取消置顶'}`);
   }
 });
+
+// IPC 处理：模式更新同步
+ipcMain.on('modes-updated', (event, data) => {
+  // 主窗口通知模式列表已更新，转发给笔记窗口
+  if (noteWindow && !noteWindow.isDestroyed()) {
+    noteWindow.webContents.send('modes-sync', data);
+    console.log('模式列表已同步到笔记窗口');
+  }
+});
+
+// IPC 处理：当前模式切换同步
+ipcMain.on('mode-switched', (event, data) => {
+  // 主窗口通知当前模式已切换，转发给笔记窗口
+  if (noteWindow && !noteWindow.isDestroyed()) {
+    noteWindow.webContents.send('mode-changed', data);
+    console.log(`当前模式已切换到: ${data.mode?.name || '未知'}`);
+  }
+});

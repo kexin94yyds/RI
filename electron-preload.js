@@ -47,15 +47,21 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => {
       // 白名单允许的频道
-      const validChannels = ['toggle-note-pin'];
+      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }
     },
     on: (channel, func) => {
-      const validChannels = ['note-pin-changed'];
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
+      }
+    },
+    removeListener: (channel, func) => {
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed'];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.removeListener(channel, func);
       }
     }
   }
