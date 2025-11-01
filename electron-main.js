@@ -199,6 +199,8 @@ async function showNoteWindow() {
     noteWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } catch (_) {}
 
+  // 临时置顶以确保窗口显示在最前面
+  const wasAlwaysOnTop = noteWindow.isAlwaysOnTop();
   try {
     noteWindow.setAlwaysOnTop(true, 'floating');
   } catch (_) {}
@@ -211,6 +213,10 @@ async function showNoteWindow() {
   setTimeout(() => {
     try {
       noteWindow.setVisibleOnAllWorkspaces(false);
+      // 还原置顶状态（如果用户没有点击置顶按钮，应该恢复为非置顶）
+      if (!wasAlwaysOnTop) {
+        noteWindow.setAlwaysOnTop(false);
+      }
     } catch (_) {}
   }, 200);
 }
