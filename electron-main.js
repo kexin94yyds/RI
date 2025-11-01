@@ -143,10 +143,13 @@ function createNoteWindow() {
   // 加载笔记窗口页面
   noteWindow.loadFile('note-window.html');
 
-  // 窗口关闭时隐藏
+  // 窗口关闭时隐藏并保存位置
   noteWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
+      // 保存窗口位置
+      const bounds = noteWindow.getBounds();
+      store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
       noteWindow.hide();
     }
   });
@@ -160,10 +163,21 @@ function createNoteWindow() {
       if (noteWindow && !noteWindow.isDestroyed() && !noteWindow.isFocused()) {
         // 如果窗口已置顶，则不自动隐藏
         if (!noteWindow.isAlwaysOnTop()) {
+          // 保存窗口位置
+          const bounds = noteWindow.getBounds();
+          store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
           noteWindow.hide();
         }
       }
     }, 200);
+  });
+  
+  // 监听窗口移动，保存新位置
+  noteWindow.on('moved', () => {
+    if (noteWindow && !noteWindow.isDestroyed()) {
+      const bounds = noteWindow.getBounds();
+      store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
+    }
   });
 
   // 调试工具
@@ -181,18 +195,28 @@ async function showNoteWindow() {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  // 获取鼠标位置
-  const cursorPoint = screen.getCursorScreenPoint();
-  const display = screen.getDisplayNearestPoint(cursorPoint);
-  const workArea = display.workArea;
+  // 尝试读取保存的窗口位置
+  const savedPosition = store.get('noteWindowPosition');
+  
+  if (savedPosition && typeof savedPosition.x === 'number' && typeof savedPosition.y === 'number') {
+    // 使用保存的位置
+    noteWindow.setPosition(savedPosition.x, savedPosition.y);
+    console.log(`使用保存的笔记窗口位置: (${savedPosition.x}, ${savedPosition.y})`);
+  } else {
+    // 首次打开，计算默认位置（右侧偏上）
+    const cursorPoint = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPoint);
+    const workArea = display.workArea;
 
-  // 获取窗口尺寸
-  const { width: winW, height: winH } = noteWindow.getBounds();
+    // 获取窗口尺寸
+    const { width: winW, height: winH } = noteWindow.getBounds();
 
-  // 右侧偏上位置
-  const targetX = Math.round(workArea.x + workArea.width - winW - 50);
-  const targetY = Math.round(workArea.y + 50);
-  noteWindow.setPosition(targetX, targetY);
+    // 右侧偏上位置
+    const targetX = Math.round(workArea.x + workArea.width - winW - 50);
+    const targetY = Math.round(workArea.y + 50);
+    noteWindow.setPosition(targetX, targetY);
+    console.log(`使用默认笔记窗口位置: (${targetX}, ${targetY})`);
+  }
 
   // 临时在所有工作区可见
   try {
