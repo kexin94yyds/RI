@@ -25,9 +25,9 @@
     "files": [
       "**/*",
       "!src-tauri/**/*",
-      "!node_modules/**/*",
       "!*.md",
-      "!.git/**/*"
+      "!.git/**/*",
+      "!dist/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
