@@ -6,9 +6,20 @@ let currentMode = null;
 let saveTimeout = null;
 let modes = [];
 
+// 搜索相关变量
+let searchBox = null;
+let searchInput = null;
+let searchCount = null;
+let searchMatches = [];
+let currentMatchIndex = -1;
+let originalContent = '';
+
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
   editor = document.getElementById('md-editor');
+  searchBox = document.getElementById('search-box');
+  searchInput = document.getElementById('search-input');
+  searchCount = document.getElementById('search-count');
   
   // 加载模式和内容
   await loadModesAndContent();
@@ -201,6 +212,9 @@ function setupEventListeners() {
       dropdown.style.display = 'none';
     }
   });
+  
+  // 搜索相关事件
+  setupSearchListeners();
   
   // 监听主窗口的模式更新事件（IPC）
   if (window.electron && window.electron.ipcRenderer) {
@@ -841,4 +855,234 @@ function showImageModal(src) {
   modal.addEventListener('click', () => {
     document.body.removeChild(modal);
   });
+}
+
+// ==================== 搜索功能 ====================
+
+// 设置搜索相关的事件监听器
+function setupSearchListeners() {
+  // 全局快捷键监听 Cmd+F 或 Ctrl+F
+  document.addEventListener('keydown', (e) => {
+    // Cmd+F (Mac) 或 Ctrl+F (Windows/Linux)
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      e.preventDefault();
+      openSearchBox();
+    }
+    
+    // Esc 键关闭搜索框
+    if (e.key === 'Escape' && searchBox.classList.contains('active')) {
+      closeSearchBox();
+    }
+  });
+  
+  // 搜索输入框事件
+  searchInput.addEventListener('input', () => {
+    performSearch(searchInput.value);
+  });
+  
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        navigateToPrevMatch();
+      } else {
+        navigateToNextMatch();
+      }
+    }
+    if (e.key === 'Escape') {
+      closeSearchBox();
+    }
+  });
+  
+  // 上一个/下一个按钮
+  document.getElementById('search-prev').addEventListener('click', navigateToPrevMatch);
+  document.getElementById('search-next').addEventListener('click', navigateToNextMatch);
+  
+  // 关闭按钮
+  document.getElementById('search-close').addEventListener('click', closeSearchBox);
+}
+
+// 打开搜索框
+function openSearchBox() {
+  searchBox.classList.add('active');
+  searchInput.focus();
+  searchInput.select();
+  
+  // 保存原始内容
+  originalContent = editor.innerHTML;
+}
+
+// 关闭搜索框
+function closeSearchBox() {
+  searchBox.classList.remove('active');
+  clearSearchHighlights();
+  searchInput.value = '';
+  searchMatches = [];
+  currentMatchIndex = -1;
+  updateSearchCount();
+}
+
+// 执行搜索
+function performSearch(query) {
+  // 清除之前的高亮
+  clearSearchHighlights();
+  
+  if (!query || query.trim() === '') {
+    searchMatches = [];
+    currentMatchIndex = -1;
+    updateSearchCount();
+    return;
+  }
+  
+  // 获取编辑器的纯文本内容
+  const textContent = editor.innerText || editor.textContent;
+  const lowerQuery = query.toLowerCase();
+  const lowerText = textContent.toLowerCase();
+  
+  // 查找所有匹配项的位置
+  searchMatches = [];
+  let index = 0;
+  while ((index = lowerText.indexOf(lowerQuery, index)) !== -1) {
+    searchMatches.push(index);
+    index += query.length;
+  }
+  
+  if (searchMatches.length > 0) {
+    // 高亮所有匹配项
+    highlightMatches(query);
+    currentMatchIndex = 0;
+    scrollToMatch(currentMatchIndex);
+  } else {
+    currentMatchIndex = -1;
+  }
+  
+  updateSearchCount();
+}
+
+// 高亮所有匹配项
+function highlightMatches(query) {
+  const innerHTML = editor.innerHTML;
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = innerHTML;
+  
+  // 递归处理所有文本节点
+  highlightTextNodes(tempDiv, query);
+  
+  editor.innerHTML = tempDiv.innerHTML;
+}
+
+// 递归高亮文本节点
+function highlightTextNodes(node, query) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    
+    if (lowerText.includes(lowerQuery)) {
+      const parent = node.parentNode;
+      const fragment = document.createDocumentFragment();
+      
+      let lastIndex = 0;
+      let index = 0;
+      let matchCount = 0;
+      
+      while ((index = lowerText.indexOf(lowerQuery, lastIndex)) !== -1) {
+        // 添加匹配前的文本
+        if (index > lastIndex) {
+          fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+        }
+        
+        // 创建高亮元素
+        const span = document.createElement('span');
+        span.className = matchCount === 0 ? 'search-highlight-active' : 'search-highlight';
+        span.textContent = text.substring(index, index + query.length);
+        span.dataset.searchMatch = matchCount;
+        fragment.appendChild(span);
+        
+        lastIndex = index + query.length;
+        matchCount++;
+      }
+      
+      // 添加剩余文本
+      if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+      }
+      
+      parent.replaceChild(fragment, node);
+    }
+  } else if (node.nodeType === Node.ELEMENT_NODE) {
+    // 跳过已经是高亮的元素
+    if (node.classList && (node.classList.contains('search-highlight') || node.classList.contains('search-highlight-active'))) {
+      return;
+    }
+    
+    // 递归处理子节点
+    const children = Array.from(node.childNodes);
+    children.forEach(child => highlightTextNodes(child, query));
+  }
+}
+
+// 清除搜索高亮
+function clearSearchHighlights() {
+  const highlights = editor.querySelectorAll('.search-highlight, .search-highlight-active');
+  highlights.forEach(span => {
+    const text = span.textContent;
+    const textNode = document.createTextNode(text);
+    span.parentNode.replaceChild(textNode, span);
+  });
+  
+  // 合并相邻的文本节点
+  editor.normalize();
+}
+
+// 导航到下一个匹配项
+function navigateToNextMatch() {
+  if (searchMatches.length === 0) return;
+  
+  currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+  scrollToMatch(currentMatchIndex);
+  updateSearchCount();
+}
+
+// 导航到上一个匹配项
+function navigateToPrevMatch() {
+  if (searchMatches.length === 0) return;
+  
+  currentMatchIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+  scrollToMatch(currentMatchIndex);
+  updateSearchCount();
+}
+
+// 滚动到指定匹配项
+function scrollToMatch(index) {
+  const highlights = editor.querySelectorAll('.search-highlight, .search-highlight-active');
+  
+  if (highlights.length === 0) return;
+  
+  // 移除所有 active 类
+  highlights.forEach(span => {
+    span.classList.remove('search-highlight-active');
+    span.classList.add('search-highlight');
+  });
+  
+  // 添加 active 类到当前匹配项
+  if (highlights[index]) {
+    highlights[index].classList.remove('search-highlight');
+    highlights[index].classList.add('search-highlight-active');
+    
+    // 滚动到可见区域
+    highlights[index].scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+  }
+}
+
+// 更新搜索计数显示
+function updateSearchCount() {
+  if (searchMatches.length === 0) {
+    searchCount.textContent = '0/0';
+  } else {
+    searchCount.textContent = `${currentMatchIndex + 1}/${searchMatches.length}`;
+  }
 }
