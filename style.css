@@ -924,6 +924,25 @@ body.no-select, body.no-select * {
   color: #000;
 }
 
+.btn-danger {
+  background: #ff4444;
+  color: white;
+  border: 1px solid #ff4444;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #cc0000;
+  border-color: #cc0000;
+  box-shadow: 0 2px 4px rgba(255, 68, 68, 0.3);
+  transform: translateY(-1px);
+}
+
 /* ==================== 滚动条样式 ==================== */
 ::-webkit-scrollbar {
   width: 8px;

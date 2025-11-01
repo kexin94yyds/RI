@@ -279,8 +279,8 @@ function setupEventListeners() {
 
   // 导入对话框
   document.getElementById("close-import-dialog")?.addEventListener("click", closeImportDialog);
-  document.getElementById("cancel-import-btn")?.addEventListener("click", closeImportDialog);
-  document.getElementById("paste-import-btn")?.addEventListener("click", pasteAndImport);
+  document.getElementById("clear-mode-btn")?.addEventListener("click", clearCurrentModeInDialog);
+  document.getElementById("confirm-import-btn")?.addEventListener("click", confirmImport);
   document.getElementById("file-import-btn")?.addEventListener("click", () => {
     document.getElementById("file-input")?.click();
   });
@@ -2139,30 +2139,29 @@ function closeImportDialog() {
   if (textEl) textEl.value = "";
 }
 
-async function pasteAndImport() {
-  const textEl = document.getElementById("import-text");
+// 在导入对话框中清空当前模式
+async function clearCurrentModeInDialog() {
+  if (!currentMode) return;
   
-  try {
-    const clipboardText = await window.electronAPI.clipboard.readText();
-    if (clipboardText && textEl) {
-      textEl.value = clipboardText;
-    }
-
-    const text = textEl?.value.trim() || "";
-    if (!text) {
-      alert("请先粘贴或输入内容列表");
-      return;
-    }
-
-    await importWords(text);
-  } catch (e) {
-    const text = textEl?.value.trim() || "";
-    if (!text) {
-      alert("请在文本框中粘贴内容列表");
-      return;
-    }
-    await importWords(text);
+  if (confirm(`确定要清空模式"${currentMode.name}"下的所有内容吗？`)) {
+    await clearWords(currentMode.id);
+    await updateHistoryList();
+    updatePreview();
+    showStatus(`已清空模式"${currentMode.name}"`);
   }
+}
+
+// 确定导入（直接导入文本框中的内容）
+async function confirmImport() {
+  const textEl = document.getElementById("import-text");
+  const text = textEl?.value.trim() || "";
+  
+  if (!text) {
+    alert("请先输入或粘贴要导入的内容");
+    return;
+  }
+
+  await importWords(text);
 }
 
 function handleFileImport(e) {
@@ -2224,7 +2223,7 @@ async function importWords(text) {
 
   closeImportDialog();
   selectedItemIndex = 0;
-  updateHistoryList();
+  await updateHistoryList();
   updatePreview();
   showStatus(message);
 }
