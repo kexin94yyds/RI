@@ -125,7 +125,7 @@ function createNoteWindow() {
     frame: false,
     resizable: true,
     transparent: false,
-    alwaysOnTop: false, // 默认不置顶，由用户通过按钮控制
+    alwaysOnTop: true, // 始终置顶
     skipTaskbar: false,
     hasShadow: true,
     roundedCorners: true,
@@ -154,23 +154,8 @@ function createNoteWindow() {
     }
   });
 
-  // 失去焦点时隐藏（仅当未置顶时）
-  noteWindow.on('blur', () => {
-    const elapsed = Date.now() - lastNoteShowAt;
-    if (elapsed < 800) return;
-    
-    setTimeout(() => {
-      if (noteWindow && !noteWindow.isDestroyed() && !noteWindow.isFocused()) {
-        // 如果窗口已置顶，则不自动隐藏
-        if (!noteWindow.isAlwaysOnTop()) {
-          // 保存窗口位置
-          const bounds = noteWindow.getBounds();
-          store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
-          noteWindow.hide();
-        }
-      }
-    }, 200);
-  });
+  // 窗口始终置顶，不需要失焦自动隐藏
+  // 用户可以通过 Cmd+M 或关闭按钮来隐藏窗口
   
   // 监听窗口移动，保存新位置
   noteWindow.on('moved', () => {
@@ -223,24 +208,15 @@ async function showNoteWindow() {
     noteWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   } catch (_) {}
 
-  // 临时置顶以确保窗口显示在最前面
-  const wasAlwaysOnTop = noteWindow.isAlwaysOnTop();
-  try {
-    noteWindow.setAlwaysOnTop(true, 'floating');
-  } catch (_) {}
-
+  // 窗口始终置顶，不需要额外设置
   noteWindow.show();
   noteWindow.focus();
   lastNoteShowAt = Date.now();
 
-  // 200ms后还原
+  // 200ms后还原工作区可见性
   setTimeout(() => {
     try {
       noteWindow.setVisibleOnAllWorkspaces(false);
-      // 还原置顶状态（如果用户没有点击置顶按钮，应该恢复为非置顶）
-      if (!wasAlwaysOnTop) {
-        noteWindow.setAlwaysOnTop(false);
-      }
     } catch (_) {}
   }, 200);
 }

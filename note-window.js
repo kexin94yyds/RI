@@ -275,7 +275,6 @@ function setupEventListeners() {
   // 按钮事件
   document.getElementById('close-btn').addEventListener('click', closeWindow);
   document.getElementById('export-btn').addEventListener('click', exportMarkdown);
-  document.getElementById('pin-btn').addEventListener('click', togglePinWindow);
   
   // 模式切换器
   document.getElementById('mode-switcher-btn').addEventListener('click', (e) => {
@@ -417,25 +416,7 @@ function closeWindow() {
   window.close();
 }
 
-// 置顶窗口切换
-let isPinned = false;
-function togglePinWindow() {
-  isPinned = !isPinned;
-  const pinBtn = document.getElementById('pin-btn');
-  
-  if (isPinned) {
-    pinBtn.classList.add('pinned');
-    pinBtn.title = '取消置顶';
-  } else {
-    pinBtn.classList.remove('pinned');
-    pinBtn.title = '置顶窗口';
-  }
-  
-  // 发送消息给主进程
-  if (window.electron && window.electron.ipcRenderer) {
-    window.electron.ipcRenderer.send('toggle-note-pin', isPinned);
-  }
-}
+// 窗口始终置顶，不需要切换功能
 
 // 导出 Markdown - 直接复制到剪贴板
 async function exportMarkdown() {
