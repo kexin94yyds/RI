@@ -214,7 +214,7 @@ async function showNoteWindow() {
 // 通过 IPC 委托给渲染进程处理（使用 IndexedDB）
 async function quickSave() {
   try {
-    if (!mainWindow) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       showNotification('保存失败', '主窗口未初始化');
       return;
     }
@@ -364,7 +364,7 @@ app.whenReady().then(() => {
   // 注册快捷键：Shift+Command+U - 呼出窗口
   const toggleShortcut = process.platform === 'darwin' ? 'Shift+Command+U' : 'Shift+Ctrl+U';
   const ret1 = globalShortcut.register(toggleShortcut, () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isVisible()) {
         mainWindow.hide();
       } else {
@@ -382,7 +382,7 @@ app.whenReady().then(() => {
   // 注册快捷键：Command+M - 呼出笔记窗口
   const noteShortcut = process.platform === 'darwin' ? 'Command+M' : 'Ctrl+M';
   const ret3 = globalShortcut.register(noteShortcut, () => {
-    if (noteWindow && noteWindow.isVisible()) {
+    if (noteWindow && !noteWindow.isDestroyed() && noteWindow.isVisible()) {
       noteWindow.hide();
     } else {
       showNoteWindow();
@@ -703,19 +703,19 @@ ipcMain.handle('shell-open-external', async (event, url) => {
 
 // IPC 处理：窗口控制
 ipcMain.handle('window-show', async () => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     await showOnActiveSpace();
   }
 });
 
 ipcMain.handle('window-hide', async () => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.hide();
   }
 });
 
 ipcMain.handle('window-toggle', async () => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isVisible()) {
       mainWindow.hide();
     } else {
@@ -726,7 +726,7 @@ ipcMain.handle('window-toggle', async () => {
 
 // IPC 处理：笔记窗口置顶控制
 ipcMain.on('toggle-note-pin', (event, isPinned) => {
-  if (noteWindow) {
+  if (noteWindow && !noteWindow.isDestroyed()) {
     noteWindow.setAlwaysOnTop(isPinned, 'floating');
     console.log(`笔记窗口置顶状态: ${isPinned ? '已置顶' : '已取消置顶'}`);
   }
