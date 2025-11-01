@@ -19,6 +19,10 @@
   ],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kexin94yyds/RI.git"
+  },
   "build": {
     "appId": "com.replaceinfo.app",
     "productName": "Replace-Information",
@@ -29,10 +33,19 @@
       "!.git/**/*",
       "!dist/**/*"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "kexin94yyds",
+      "repo": "RI",
+      "releaseType": "release"
+    },
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "RI.png",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false
     },
@@ -52,11 +65,17 @@
     },
     "win": {
       "icon": "RI.png",
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
       "icon": "RI.png",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   },
   "devDependencies": {
@@ -64,6 +83,7 @@
     "electron-builder": "^26.0.12"
   },
   "dependencies": {
-    "electron-store": "^8.1.0"
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.6.2"
   }
 }
