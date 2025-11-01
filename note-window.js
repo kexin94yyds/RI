@@ -107,10 +107,12 @@ function loadNoteContent() {
     editor.innerHTML = currentMode.notes;
     editorContent = currentMode.notes;
     editor.removeAttribute('data-placeholder');
+    console.log(`📝 已加载模式 "${currentMode.name}" 的笔记 (ID: ${currentMode.id}, 内容长度: ${currentMode.notes.length})`);
   } else {
     editor.innerHTML = '';
     editorContent = '';
     editor.setAttribute('data-placeholder', '在此输入内容或粘贴富文本...');
+    console.log(`📝 模式 "${currentMode?.name || '未知'}" 没有笔记内容，显示空白编辑器`);
   }
 }
 
@@ -180,15 +182,27 @@ function loadModesIntoDropdown() {
 // 切换到指定模式
 async function switchToMode(mode) {
   try {
-    // 先保存当前笔记
+    const oldModeName = currentMode?.name || '(无)';
+    
+    // 清除防抖定时器，立即保存当前笔记
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    
+    // 确保保存最新的编辑器内容
     await saveNoteContent();
+    console.log(`✓ 已保存旧模式 "${oldModeName}" 的笔记`);
     
     // 切换模式
     currentModeId = mode.id;
+    
+    // 从数据库重新加载新模式的完整数据（确保获取最新的 notes）
     currentMode = await getMode(currentModeId);
     
     if (!currentMode) {
-      console.error('目标模式不存在');
+      console.error(`❌ 目标模式 ${currentModeId} 不存在`);
+      showNotification('模式不存在！', false);
       return;
     }
     
@@ -197,6 +211,7 @@ async function switchToMode(mode) {
     
     // 加载新模式的笔记
     loadNoteContent();
+    console.log(`✓ 已加载新模式 "${currentMode.name}" 的笔记，内容长度: ${currentMode.notes?.length || 0}`);
     
     // 更新显示
     updateTitle();
@@ -208,9 +223,17 @@ async function switchToMode(mode) {
     // 显示通知
     showNotification(`已切换到：${currentMode.name}`);
     
-    console.log('切换到模式:', currentMode.name);
+    // 通知主窗口模式已切换
+    if (window.electron && window.electron.ipcRenderer) {
+      window.electron.ipcRenderer.send('mode-switched-from-note', {
+        modeId: currentModeId
+      });
+    }
+    
+    console.log(`🔄 切换完成: "${oldModeName}" → "${currentMode.name}"`);
   } catch (error) {
-    console.error('切换模式失败:', error);
+    console.error('❌ 切换模式失败:', error);
+    showNotification('切换模式失败: ' + error.message, false);
   }
 }
 
@@ -294,40 +317,79 @@ function setupEventListeners() {
   // 搜索相关事件
   setupSearchListeners();
   
+  // 窗口失去焦点时自动保存
+  window.addEventListener('blur', async () => {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    await saveNoteContent();
+    console.log('窗口失去焦点，已自动保存');
+  });
+  
   // 监听主窗口的模式更新事件（IPC）
   if (window.electron && window.electron.ipcRenderer) {
     // 监听模式列表更新
-    window.electron.ipcRenderer.on('modes-sync', (data) => {
+    window.electron.ipcRenderer.on('modes-sync', async (data) => {
       console.log('📝 笔记窗口收到模式列表更新:', data);
       modes = data.modes || [];
-      if (data.currentMode) {
-        // 查找对应的模式对象
-        const updatedMode = modes.find(m => m.id === data.currentMode.id);
-        if (updatedMode) {
-          currentMode = updatedMode;
-          // 重新加载当前模式的笔记内容
-          loadNoteContent();
+      
+      // 重要：只更新模式列表，不改变当前正在编辑的模式
+      // 只有在接收到 mode-changed 事件时才真正切换模式
+      
+      // 但需要更新当前模式的引用（保持最新数据）
+      if (currentModeId) {
+        const updatedCurrentMode = modes.find(m => m.id === currentModeId);
+        if (updatedCurrentMode) {
+          // 先保存当前编辑的内容
+          if (saveTimeout) {
+            clearTimeout(saveTimeout);
+            saveTimeout = null;
+          }
+          await saveNoteContent();
+          
+          // 更新当前模式对象（但不重新加载笔记，保持正在编辑的内容）
+          currentMode = updatedCurrentMode;
+          console.log(`✓ 当前模式对象已更新: ${currentMode.name}`);
         }
       }
+      
       updateModeSwitcherDisplay();
-      updateTitle();
-      showNotification('✓ 模式列表已同步', true);
     });
     
     // 监听当前模式切换
-    window.electron.ipcRenderer.on('mode-changed', (data) => {
+    window.electron.ipcRenderer.on('mode-changed', async (data) => {
       console.log('📝 笔记窗口收到模式切换通知:', data);
       if (data.mode) {
-        // 查找对应的模式对象
-        const newMode = modes.find(m => m.id === data.mode.id);
-        if (newMode) {
-          currentMode = newMode;
-          // 加载新模式的笔记内容
-          loadNoteContent();
-          updateModeSwitcherDisplay();
-          updateTitle();
-          showNotification(`✓ 已切换到: ${data.mode.name}`, true);
+        // 先保存当前笔记
+        if (saveTimeout) {
+          clearTimeout(saveTimeout);
+          saveTimeout = null;
         }
+        await saveNoteContent();
+        console.log(`✓ 已保存旧模式 ${currentMode?.name} 的笔记`);
+        
+        // 切换到新模式
+        currentModeId = data.mode.id;
+        
+        // 从数据库重新加载新模式的完整数据
+        currentMode = await getMode(currentModeId);
+        
+        if (!currentMode) {
+          console.error(`❌ 模式 ${currentModeId} 不存在`);
+          return;
+        }
+        
+        // 保存当前模式 ID
+        await setSetting('currentModeId', currentModeId);
+        
+        // 加载新模式的笔记内容
+        loadNoteContent();
+        updateModeSwitcherDisplay();
+        updateTitle();
+        
+        console.log(`✓ 已切换到模式: ${currentMode.name}, 笔记内容长度: ${currentMode.notes?.length || 0}`);
+        showNotification(`✓ 已切换到: ${currentMode.name}`, true);
       }
     });
     
@@ -410,10 +472,25 @@ function handleEditorClick(e) {
 // ==================== 按钮功能 ====================
 
 // 关闭窗口
-function closeWindow() {
-  // 使用 window.close() 会触发 electron-main.js 中的 'close' 事件
-  // 该事件会自动将窗口隐藏而不是真正关闭
-  window.close();
+async function closeWindow() {
+  try {
+    // 关闭前清除防抖定时器并保存
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    
+    // 保存当前内容
+    await saveNoteContent();
+    
+    console.log('窗口关闭前已保存内容');
+  } catch (error) {
+    console.error('关闭前保存失败:', error);
+  } finally {
+    // 使用 window.close() 会触发 electron-main.js 中的 'close' 事件
+    // 该事件会自动将窗口隐藏而不是真正关闭
+    window.close();
+  }
 }
 
 // 窗口始终置顶，不需要切换功能
@@ -703,9 +780,17 @@ async function handleImageFile(file) {
     
     insertElementAtCursor(img);
     
-    handleEditorInput();
+    // 立即更新并保存内容
+    editorContent = editor.innerHTML;
+    updateTitle();
     
-    console.log('图片已插入');
+    // 清除之前的防抖定时器，设置新的保存
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => {
+      saveNoteContent();
+    }, 500);
+    
+    console.log('图片已插入并等待保存');
   } catch (error) {
     console.error('处理图片失败:', error);
     showNotification('图片处理失败: ' + error.message, false);
@@ -780,12 +865,15 @@ function insertElementAtCursor(element) {
 
 async function saveNoteContent() {
   try {
-    if (!currentMode || !currentModeId) return;
+    if (!currentMode || !currentModeId) {
+      console.warn('⚠️ 无法保存：currentMode 或 currentModeId 为空');
+      return;
+    }
     
     // 确保获取最新的编辑器内容（包括格式化修改）
     editorContent = editor.innerHTML;
     
-    // 更新模式的笔记内容
+    // 更新模式的笔记内容到数据库
     await updateMode(currentModeId, {
       notes: editorContent
     });
@@ -793,9 +881,9 @@ async function saveNoteContent() {
     // 更新本地缓存
     currentMode.notes = editorContent;
     
-    console.log('笔记已自动保存');
+    console.log(`💾 已保存模式 "${currentMode.name}" 的笔记 (ID: ${currentModeId}, 内容长度: ${editorContent.length})`);
   } catch (error) {
-    console.error('保存失败:', error);
+    console.error(`❌ 保存模式 "${currentMode?.name}" 的笔记失败:`, error);
   }
 }
 

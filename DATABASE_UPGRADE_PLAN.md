@@ -269,3 +269,7 @@ const notes = await getNotesByMode(currentModeId);
 - [IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 - [ClipBook 项目](https://github.com/vladimir-ikryanov/ClipBook) - 实际应用案例
 
+
+
+
+

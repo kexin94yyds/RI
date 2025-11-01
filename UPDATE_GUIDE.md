@@ -213,3 +213,7 @@ npm run build:mac
    - 提醒用户重要更新前备份
    - 数据存储在 `~/Library/Application Support/replace-information/`
 
+
+
+
+
