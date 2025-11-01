@@ -289,6 +289,16 @@ export async function saveWord(modeId, wordData) {
     createdAt: wordData.createdAt || Date.now()
   };
 
+  // 如果是图片，保存额外的图片字段
+  if (wordData.type === 'image') {
+    word.fileName = wordData.fileName;
+    word.thumbFileName = wordData.thumbFileName;
+    word.width = wordData.width;
+    word.height = wordData.height;
+    word.size = wordData.size;
+    word.path = wordData.path;
+  }
+
   return runWithRetry(() => {
     const transaction = db.transaction([WORDS_STORE], 'readwrite');
     const store = transaction.objectStore(WORDS_STORE);

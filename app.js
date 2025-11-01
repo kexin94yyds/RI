@@ -94,10 +94,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         if (!isDuplicate) {
           // 保存到 IndexedDB
-          await saveW({
-            modeId: currentMode.id,
+          await saveW(currentMode.id, {
             ...item,
-            timestamp: Date.now()
+            createdAt: Date.now()
           });
           
           window.electronAPI.sendNotification('已保存', displayText);
@@ -1199,7 +1198,7 @@ async function updateHistoryList() {
     }
     words = allWords;
   } else {
-    if (!currentMode) return;
+  if (!currentMode) return;
     // 从 IndexedDB 加载当前模式的 words
     words = await getWordsByMode(currentMode.id) || [];
   }
@@ -1625,7 +1624,8 @@ async function handlePreviewTextBlur() {
     const updatedWord = {
       ...wordToUpdate,
       content: newWord,
-      type: 'text'
+      type: 'text',
+      createdAt: wordToUpdate.createdAt || Date.now()
     };
 
     // 保存到 IndexedDB（先删除再添加）
@@ -1675,7 +1675,8 @@ async function handleRichEditorSave(richEditor) {
     // 更新内容
     const updatedWord = {
       ...wordToUpdate,
-      html: newHtml
+      html: newHtml,
+      createdAt: wordToUpdate.createdAt || Date.now()
     };
 
     // 保存到 IndexedDB（先删除再添加）
@@ -1935,6 +1936,7 @@ async function saveWord() {
     // 保存图片数据
     itemToSave = {
       type: 'image',
+      content: currentClipboardData.fileName, // 图片使用文件名作为content
       fileName: currentClipboardData.fileName,
       thumbFileName: currentClipboardData.thumbFileName,
       width: currentClipboardData.width,
@@ -2038,10 +2040,10 @@ async function markAsRemembered() {
   // 从 IndexedDB 删除
   const allWords = await getWordsByMode(currentMode.id);
   const wordToDelete = allWords.find(w => JSON.stringify(w) === JSON.stringify(currentReview));
-  
+
   if (wordToDelete && wordToDelete.id) {
     await deleteWord(wordToDelete.id);
-  }
+          }
 
   const reviewWordEl = document.getElementById("review-word");
   if (reviewWordEl) reviewWordEl.innerText = "已移除：" + currentReview;
@@ -2455,7 +2457,8 @@ async function saveListItemEdit(newText) {
     const updatedWord = {
       ...wordToUpdate,
       content: newText,
-      type: 'text'
+      type: 'text',
+      createdAt: wordToUpdate.createdAt || Date.now()
     };
     
     // 保存更新（先删除再添加）
