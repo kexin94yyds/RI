@@ -172,8 +172,13 @@ function createNoteWindow() {
 
 // 显示笔记窗口
 async function showNoteWindow() {
-  if (!noteWindow) {
+  // 如果窗口不存在或已销毁，重新创建
+  if (!noteWindow || noteWindow.isDestroyed()) {
+    console.log('笔记窗口不存在或已销毁，重新创建');
+    noteWindow = null;
     createNoteWindow();
+    // 等待窗口创建完成
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   // 获取鼠标位置
@@ -382,9 +387,18 @@ app.whenReady().then(() => {
   // 注册快捷键：Command+M - 呼出笔记窗口
   const noteShortcut = process.platform === 'darwin' ? 'Command+M' : 'Ctrl+M';
   const ret3 = globalShortcut.register(noteShortcut, () => {
-    if (noteWindow && !noteWindow.isDestroyed() && noteWindow.isVisible()) {
-      noteWindow.hide();
-    } else {
+    try {
+      if (noteWindow && !noteWindow.isDestroyed() && noteWindow.isVisible()) {
+        console.log('隐藏笔记窗口');
+        noteWindow.hide();
+      } else {
+        console.log('显示笔记窗口');
+        showNoteWindow();
+      }
+    } catch (error) {
+      console.error('笔记窗口切换失败:', error);
+      // 如果出错，重新创建窗口
+      noteWindow = null;
       showNoteWindow();
     }
   });
