@@ -868,7 +868,12 @@ function setupSearchListeners() {
     // Cmd+F (Mac) 或 Ctrl+F (Windows/Linux)
     if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
       e.preventDefault();
-      openSearchBox();
+      // 切换搜索框：如果已打开就关闭，否则打开
+      if (searchBox.classList.contains('active')) {
+        closeSearchBox();
+      } else {
+        openSearchBox();
+      }
     }
     
     // Esc 键关闭搜索框
