@@ -479,6 +479,15 @@ async function saveCombinedNoteEntry() {
       // 保存到 IndexedDB
       await saveWord(currentModeId, entry);
       console.log('✅ 笔记已保存到 IndexedDB');
+      
+      // 通知主窗口刷新数据
+      if (window.electron && window.electron.ipcRenderer) {
+        window.electron.ipcRenderer.send('note-saved', { 
+          modeId: currentModeId,
+          timestamp: Date.now()
+        });
+        console.log('📤 已通知主窗口刷新数据');
+      }
     }
   } catch (err) {
     console.error('保存图文合一笔记失败:', err);

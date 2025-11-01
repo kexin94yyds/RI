@@ -770,6 +770,15 @@ ipcMain.on('mode-switched', (event, data) => {
   }
 });
 
+// IPC 处理：笔记保存通知
+ipcMain.on('note-saved', (event, data) => {
+  // 笔记窗口通知有新内容保存，转发给主窗口刷新
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('note-saved', data);
+    console.log(`笔记已保存，通知主窗口刷新 (模式ID: ${data.modeId})`);
+  }
+});
+
 // ==================== 自动更新功能 ====================
 
 // 配置自动更新

@@ -43,10 +43,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('show-notification', { title, body });
   },
   
-  // IPC 通信 - 用于快速保存
+  // IPC 通信 - 用于快速保存和笔记保存通知
   ipcRenderer: {
     on: (channel, func) => {
-      const validChannels = ['quick-save-item'];
+      const validChannels = ['quick-save-item', 'note-saved'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
@@ -62,7 +62,7 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => {
       // 白名单允许的频道
-      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched'];
+      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched', 'note-saved'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }

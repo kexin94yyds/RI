@@ -114,6 +114,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.electronAPI.sendNotification('保存失败', '发生错误');
       }
     });
+    
+    // 监听来自笔记窗口的保存通知
+    window.electronAPI.ipcRenderer.on('note-saved', async (data) => {
+      console.log('📝 收到笔记保存通知:', data);
+      try {
+        // 刷新历史列表（如果是当前模式）
+        if (data.modeId === currentModeId) {
+          await updateHistoryList();
+          console.log('✅ 主页面已刷新列表');
+        }
+      } catch (error) {
+        console.error('❌ 刷新主页面失败:', error);
+      }
+    });
   }
   
   // 默认焦点在搜索框
