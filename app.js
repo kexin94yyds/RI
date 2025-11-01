@@ -8,6 +8,7 @@ import {
   deleteMode as deleteModeFromDB,
   getWordsByMode, 
   saveWord as saveW, 
+  updateWord,
   deleteWord, 
   clearAllWords as clearWords,
   updateModesOrder,
@@ -1729,16 +1730,13 @@ async function handleRichEditorSave(richEditor) {
   });
   
   if (wordToUpdate && wordToUpdate.id) {
-    // 更新内容
-    const updatedWord = {
-      ...wordToUpdate,
+    // 使用 updateWord 直接更新，保持原有 ID
+    await updateWord(wordToUpdate.id, {
       html: newHtml,
-      createdAt: wordToUpdate.createdAt || Date.now()
-    };
-
-    // 保存到 IndexedDB（先删除再添加）
-    await deleteWord(wordToUpdate.id);
-    await saveW(currentMode.id, updatedWord);
+      content: plainText  // 同时更新纯文本用于搜索
+    });
+    
+    console.log('✅ 富文本已更新到 IndexedDB:', { id: wordToUpdate.id });
     
     // 更新 data-original 属性
     richEditor.setAttribute('data-original', newHtml);
@@ -2572,17 +2570,13 @@ async function saveListItemEdit(newText) {
   });
   
   if (wordToUpdate && wordToUpdate.id) {
-    // 更新内容
-    const updatedWord = {
-      ...wordToUpdate,
+    // 使用 updateWord 直接更新，保持原有 ID
+    await updateWord(wordToUpdate.id, {
       content: newText,
-      type: 'text',
-      createdAt: wordToUpdate.createdAt || Date.now()
-    };
+      type: 'text'
+    });
     
-    // 保存更新（先删除再添加）
-    await deleteWord(wordToUpdate.id);
-    await saveW(currentMode.id, updatedWord);
+    console.log('✅ 内容已更新到 IndexedDB:', { id: wordToUpdate.id, content: newText });
     
     // 重置编辑状态
     editingItemIndex = -1;

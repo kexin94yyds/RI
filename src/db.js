@@ -363,6 +363,45 @@ export async function saveWord(modeId, wordData) {
   });
 }
 
+export async function updateWord(id, wordData) {
+  await ensureDb();
+
+  return runWithRetry(() => new Promise((resolve, reject) => {
+    const transaction = db.transaction([WORDS_STORE], 'readwrite');
+    const store = transaction.objectStore(WORDS_STORE);
+
+    const getRequest = store.get(id);
+
+    getRequest.onsuccess = () => {
+      const existingWord = getRequest.result;
+      if (!existingWord) {
+        reject(new Error(`单词 ${id} 不存在`));
+        return;
+      }
+
+      // 合并更新，保持原有的 id, modeId, createdAt
+      const updatedWord = {
+        ...existingWord,
+        ...wordData,
+        id,  // 保持原有 ID
+        modeId: existingWord.modeId,  // 保持原有 modeId
+        createdAt: existingWord.createdAt  // 保持原有创建时间
+      };
+
+      // 如果是文本类型，清理内容
+      if (updatedWord.content && typeof updatedWord.content === 'string') {
+        updatedWord.content = sanitizeString(updatedWord.content, MAX_WORD_LENGTH);
+      }
+
+      // 使用 put 更新（保持原 ID）
+      const putRequest = store.put(updatedWord);
+      wrapRequest(putRequest, () => updatedWord).then(resolve).catch(reject);
+    };
+
+    getRequest.onerror = () => reject(getRequest.error);
+  }));
+}
+
 export async function deleteWord(id) {
   await ensureDb();
 
