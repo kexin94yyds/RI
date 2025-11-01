@@ -333,7 +333,9 @@ function handleEditorClick(e) {
 
 // 关闭窗口
 function closeWindow() {
-  window.electronAPI.window.hide();
+  // 使用 window.close() 会触发 electron-main.js 中的 'close' 事件
+  // 该事件会自动将窗口隐藏而不是真正关闭
+  window.close();
 }
 
 // 置顶窗口切换
