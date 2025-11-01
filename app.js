@@ -311,12 +311,9 @@ async function loadModes() {
       await window.electronAPI.store.set('currentModeId', currentModeId);
     }
     
-    // 加载当前模式（包含单词列表）
+    // 加载当前模式
     currentMode = await getMode(currentModeId);
-    if (currentMode) {
-      // 加载该模式的单词列表
-      currentMode.words = await getWordsByMode(currentModeId);
-    }
+    // 注意：不再使用 currentMode.words，所有数据通过 getWordsByMode() 从 IndexedDB 获取
     
   updateModeSidebar();
   } catch (error) {
