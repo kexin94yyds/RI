@@ -371,7 +371,7 @@ function showNotification(title, body) {
       title: title,
       body: body,
       silent: false,
-      icon: path.join(__dirname, '信息置换.png')
+      icon: path.join(__dirname, 'RI.png')
     }).show();
   }
 }
