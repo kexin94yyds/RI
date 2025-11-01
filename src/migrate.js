@@ -5,7 +5,9 @@ import {
   saveMode, 
   saveWord, 
   updateMode,
-  getAllModes 
+  getAllModes,
+  getSetting,
+  setSetting
 } from './db.js';
 
 // 检查是否已迁移
@@ -87,7 +89,7 @@ export async function migrateFromElectronStore() {
     // 5. 设置默认当前模式
     const allModes = await getAllModes();
     if (allModes.length > 0) {
-      await window.electronAPI.store.set('currentModeId', allModes[0].id);
+      await setSetting('currentModeId', allModes[0].id);
     }
     
     console.log('✅ 数据迁移完成！');
@@ -115,7 +117,7 @@ async function createDefaultMode() {
     createdAt: Date.now()
   });
   
-  await window.electronAPI.store.set('currentModeId', defaultMode.id);
+  await setSetting('currentModeId', defaultMode.id);
   console.log('✅ 已创建默认模式');
   return defaultMode;
 }

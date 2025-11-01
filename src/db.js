@@ -2,10 +2,11 @@
 // 参考 insidebar-ai 的成熟实现
 
 const DB_NAME = 'RIDB';
-const DB_VERSION = 2; // v2: add 'order' field/index for modes
+const DB_VERSION = 3; // v3: add 'settings' store for config
 const MODES_STORE = 'modes';
 const NOTES_STORE = 'notes';
 const WORDS_STORE = 'words';
+const SETTINGS_STORE = 'settings';
 
 // 验证常量
 const MAX_NAME_LENGTH = 100;
@@ -104,6 +105,11 @@ export async function initDB() {
         wordsStore.createIndex('type', 'type', { unique: false });
         wordsStore.createIndex('createdAt', 'createdAt', { unique: false });
         wordsStore.createIndex('[modeId+createdAt]', ['modeId', 'createdAt'], { unique: false });
+      }
+
+      // v3: 创建 settings 表（存储配置）
+      if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
+        db.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
       }
     };
   });
@@ -479,6 +485,30 @@ function wrapRequest(request, mapper) {
         reject(request.error);
       }
     };
+  });
+}
+
+// ==================== Settings 管理 ====================
+
+export async function getSetting(key, defaultValue = null) {
+  await ensureDb();
+
+  return runWithRetry(() => {
+    const transaction = db.transaction([SETTINGS_STORE], 'readonly');
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const request = store.get(key);
+    return wrapRequest(request, value => value ? value.value : defaultValue);
+  });
+}
+
+export async function setSetting(key, value) {
+  await ensureDb();
+
+  return runWithRetry(() => {
+    const transaction = db.transaction([SETTINGS_STORE], 'readwrite');
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const request = store.put({ key, value });
+    return wrapRequest(request);
   });
 }
 

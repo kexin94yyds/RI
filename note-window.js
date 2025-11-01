@@ -6,7 +6,9 @@ import {
   updateMode,
   getNotesByMode,
   getWordsByMode,
-  saveWord 
+  saveWord,
+  getSetting,
+  setSetting
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
 
@@ -62,12 +64,12 @@ async function loadModesAndContent() {
     }
     
     // 获取当前模式 ID
-    currentModeId = await window.electronAPI.store.get('currentModeId');
+    currentModeId = await getSetting('currentModeId');
     
     if (!currentModeId || !modes.find(m => m.id === currentModeId)) {
       // 如果没有或无效，使用第一个模式
       currentModeId = modes[0].id;
-      await window.electronAPI.store.set('currentModeId', currentModeId);
+      await setSetting('currentModeId', currentModeId);
     }
     
     // 加载当前模式
@@ -177,7 +179,7 @@ async function switchToMode(mode) {
     }
     
     // 保存当前模式 ID
-    await window.electronAPI.store.set('currentModeId', currentModeId);
+    await setSetting('currentModeId', currentModeId);
     
     // 加载新模式的笔记
     loadNoteContent();

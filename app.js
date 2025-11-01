@@ -10,7 +10,9 @@ import {
   saveWord as saveW, 
   deleteWord, 
   clearAllWords as clearWords,
-  updateModesOrder
+  updateModesOrder,
+  getSetting,
+  setSetting
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
 
@@ -310,12 +312,12 @@ async function loadModes() {
     }
     
     // 获取当前模式 ID
-    currentModeId = await window.electronAPI.store.get('currentModeId');
+    currentModeId = await getSetting('currentModeId');
     
     if (!currentModeId || !modes.find(m => m.id === currentModeId)) {
       // 如果没有或无效，使用第一个模式
       currentModeId = modes[0].id;
-      await window.electronAPI.store.set('currentModeId', currentModeId);
+      await setSetting('currentModeId', currentModeId);
     }
     
     // 加载当前模式
@@ -333,7 +335,7 @@ async function saveModes() {
   if (currentMode) {
     // 始终以当前模式为准持久化 ID，避免因变量未同步导致恢复到错误的模式
     currentModeId = currentMode.id;
-    await window.electronAPI.store.set('currentModeId', currentModeId);
+    await setSetting('currentModeId', currentModeId);
   }
   
   // 通知笔记窗口模式已更新
@@ -849,7 +851,7 @@ async function switchToMode(mode) {
   currentMode = mode;
   // 立刻同步并持久化当前模式 ID，避免窗口获得焦点后恢复到旧模式
   currentModeId = mode.id;
-  try { await window.electronAPI.store.set('currentModeId', currentModeId); } catch (_) {}
+  try { await setSetting('currentModeId', currentModeId); } catch (_) {}
   await saveModes();
   updateModeSidebar();
   clearSearch();
