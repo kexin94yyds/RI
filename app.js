@@ -63,6 +63,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupEventListeners();
   await updateHistoryList();
   
+  // 监听来自主进程的快速保存请求
+  if (window.electronAPI && window.electronAPI.ipcRenderer) {
+    window.electronAPI.ipcRenderer.on('quick-save-item', async (data) => {
+      console.log('🚀 收到快速保存请求:', data);
+      try {
+        if (!currentMode) {
+          window.electronAPI.sendNotification('保存失败', '未找到当前模式');
+          return;
+        }
+        
+        const { item, displayText } = data;
+        
+        // 检查是否已存在
+        const existingWords = await getWordsByMode(currentMode.id);
+        const isDuplicate = existingWords.some(word => {
+          if (typeof word === 'string') {
+            return item.type === 'text' && word === item.content;
+          }
+          if (typeof word === 'object') {
+            if (word.type === 'image' && item.type === 'image') {
+              return word.fileName === item.fileName;
+            }
+            if (word.type === 'text' && item.type === 'text') {
+              return word.content === item.content;
+            }
+          }
+          return false;
+        });
+        
+        if (!isDuplicate) {
+          // 保存到 IndexedDB
+          await saveW({
+            modeId: currentMode.id,
+            ...item,
+            timestamp: Date.now()
+          });
+          
+          window.electronAPI.sendNotification('已保存', displayText);
+          
+          // 刷新列表
+          await updateHistoryList();
+        } else {
+          window.electronAPI.sendNotification('提示', '内容已存在');
+        }
+      } catch (error) {
+        console.error('快速保存失败:', error);
+        window.electronAPI.sendNotification('保存失败', '发生错误');
+      }
+    });
+  }
+  
   // 默认焦点在搜索框
   setTimeout(() => {
     document.getElementById("search-input")?.focus();

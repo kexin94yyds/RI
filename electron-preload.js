@@ -38,6 +38,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url) => ipcRenderer.invoke('shell-open-external', url)
   },
   
+  // 通知 API
+  sendNotification: (title, body) => {
+    ipcRenderer.send('show-notification', { title, body });
+  },
+  
+  // IPC 通信 - 用于快速保存
+  ipcRenderer: {
+    on: (channel, func) => {
+      const validChannels = ['quick-save-item'];
+      if (validChannels.includes(channel)) {
+        ipcRenderer.on(channel, (event, ...args) => func(...args));
+      }
+    }
+  },
+  
   // 系统信息
   platform: process.platform
 });
@@ -53,13 +68,13 @@ contextBridge.exposeInMainWorld('electron', {
       }
     },
     on: (channel, func) => {
-      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed'];
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
     },
     removeListener: (channel, func) => {
-      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed'];
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item'];
       if (validChannels.includes(channel)) {
         ipcRenderer.removeListener(channel, func);
       }

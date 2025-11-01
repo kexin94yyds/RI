@@ -211,21 +211,14 @@ async function showNoteWindow() {
 }
 
 // 快速保存（不显示窗口，只显示通知）
+// 通过 IPC 委托给渲染进程处理（使用 IndexedDB）
 async function quickSave() {
   try {
-    // 获取当前模式和单词列表
-    const wordModes = store.get('wordModes') || [{ id: 'default', name: '默认', words: [] }];
-    const currentWordMode = store.get('currentWordMode') || wordModes[0];
-    
-    // 查找当前模式的索引
-    const modeIndex = wordModes.findIndex(m => m.id === currentWordMode.id);
-    if (modeIndex === -1) {
-      showNotification('保存失败', '未找到当前模式');
+    if (!mainWindow) {
+      showNotification('保存失败', '主窗口未初始化');
       return;
     }
 
-    const mode = wordModes[modeIndex];
-    
     // 检查剪贴板中是否有图片
     const image = clipboard.readImage();
     const hasValidImage = !image.isEmpty();
@@ -332,31 +325,11 @@ async function quickSave() {
       displayText = trimmedText.length > 20 ? trimmedText.substring(0, 20) + '...' : trimmedText;
     }
 
-    // 检查是否已存在
-    const isDuplicate = mode.words.some(word => {
-      if (typeof word === 'string') {
-        return itemToSave.type === 'text' && word === itemToSave.content;
-      }
-      if (typeof word === 'object') {
-        if (word.type === 'image' && itemToSave.type === 'image') {
-          return word.fileName === itemToSave.fileName;
-        }
-        if (word.type === 'text' && itemToSave.type === 'text') {
-          return word.content === itemToSave.content;
-        }
-      }
-      return false;
+    // 发送给渲染进程处理（使用 IndexedDB 保存）
+    mainWindow.webContents.send('quick-save-item', {
+      item: itemToSave,
+      displayText: displayText
     });
-    
-    if (!isDuplicate) {
-      mode.words.unshift(itemToSave);
-      wordModes[modeIndex] = mode;
-      store.set('wordModes', wordModes);
-      store.set('currentWordMode', mode);
-      showNotification('已保存', displayText);
-    } else {
-      showNotification('提示', '内容已存在');
-    }
   } catch (error) {
     console.error('快速保存失败:', error);
     showNotification('保存失败', '发生错误');
@@ -470,6 +443,11 @@ ipcMain.handle('store-delete', async (event, key) => {
 
 ipcMain.handle('store-clear', async () => {
   store.clear();
+});
+
+// IPC 处理：显示通知
+ipcMain.on('show-notification', (event, { title, body }) => {
+  showNotification(title, body);
 });
 
 // 获取图片存储目录
