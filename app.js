@@ -1,8 +1,22 @@
-// app.js - 多模式内容记录器（Electron版本 - 三栏布局）
+// app.js - 多模式内容记录器（Electron版本 - 三栏布局，使用 IndexedDB）
+
+import { 
+  getAllModes, 
+  getMode, 
+  saveMode as saveM, 
+  updateMode, 
+  deleteMode,
+  getWordsByMode, 
+  saveWord as saveW, 
+  deleteWord, 
+  clearAllWords as clearWords 
+} from './src/db.js';
+import { autoCheckAndMigrate } from './src/migrate.js';
 
 // 全局变量
 let modes = [];
 let currentMode = null;
+let currentModeId = null;
 let isAddingMode = false;
 let editingModeId = null;
 let searchQuery = "";
@@ -23,6 +37,13 @@ function htmlToPlain(html) {
 
 // 初始化
 document.addEventListener("DOMContentLoaded", async () => {
+  // 检查并自动迁移数据
+  const needsMigration = await autoCheckAndMigrate();
+  if (needsMigration) {
+    console.log('等待数据迁移完成...');
+    return; // 迁移完成后会自动刷新页面
+  }
+  
   await loadModes();
   await showClipboard();
   setupEventListeners();
@@ -208,17 +229,42 @@ function setupEventListeners() {
 // ==================== 模式管理 ====================
 
 async function loadModes() {
-  const wordModes = await window.electronAPI.store.get("wordModes");
-  const currentWordMode = await window.electronAPI.store.get("currentWordMode");
-  
-  modes = wordModes || [{ id: "default", name: "默认", words: [] }];
-  currentMode = currentWordMode || modes[0];
-  updateModeSidebar();
+  try {
+    // 从 IndexedDB 加载所有模式
+    modes = await getAllModes();
+    
+    if (modes.length === 0) {
+      console.warn('没有找到模式');
+      return;
+    }
+    
+    // 获取当前模式 ID
+    currentModeId = await window.electronAPI.store.get('currentModeId');
+    
+    if (!currentModeId || !modes.find(m => m.id === currentModeId)) {
+      // 如果没有或无效，使用第一个模式
+      currentModeId = modes[0].id;
+      await window.electronAPI.store.set('currentModeId', currentModeId);
+    }
+    
+    // 加载当前模式（包含单词列表）
+    currentMode = await getMode(currentModeId);
+    if (currentMode) {
+      // 加载该模式的单词列表
+      currentMode.words = await getWordsByMode(currentModeId);
+    }
+    
+    updateModeSidebar();
+  } catch (error) {
+    console.error('加载模式失败:', error);
+  }
 }
 
 async function saveModes() {
-  await window.electronAPI.store.set("wordModes", modes);
-  await window.electronAPI.store.set("currentWordMode", currentMode);
+  // IndexedDB 会自动保存，这里主要是通知其他窗口
+  if (currentMode && currentModeId) {
+    await window.electronAPI.store.set('currentModeId', currentModeId);
+  }
   
   // 通知笔记窗口模式已更新
   if (window.electron && window.electron.ipcRenderer) {
@@ -273,7 +319,7 @@ function updateModeSidebar() {
         e.stopPropagation();
         return;
       }
-      switchToMode(mode);
+        switchToMode(mode);
     });
 
     // 右键点击显示菜单（仅当模式数量大于1时）
@@ -691,16 +737,16 @@ function showContextMenu(e, mode) {
       event.stopPropagation();
       const action = item.getAttribute("data-action");
       
-      if (action === "edit") {
-        editMode(mode);
-      } else if (action === "delete") {
-        deleteMode(mode);
-      }
+        if (action === "edit") {
+      editMode(mode);
+        } else if (action === "delete") {
+      deleteMode(mode);
+        }
       
       hideContextMenu();
+      });
     });
-  });
-  
+
   // 定位菜单
   menu.style.left = e.pageX + "px";
   menu.style.top = e.pageY + "px";
@@ -1785,7 +1831,7 @@ window.deleteCurrentItem = async function() {
   }
   
   const word = filteredWords[selectedItemIndex];
-  await deleteContentItem(word);
+    await deleteContentItem(word);
   showStatus("已删除");
 };
 

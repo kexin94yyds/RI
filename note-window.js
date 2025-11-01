@@ -1,8 +1,17 @@
-// note-window.js - 完整的笔记窗口功能（一比一复刻）
+// note-window.js - 完整的笔记窗口功能（使用 IndexedDB）
+
+import { 
+  getAllModes, 
+  getMode,
+  updateMode,
+  getNotesByMode 
+} from './src/db.js';
+import { autoCheckAndMigrate } from './src/migrate.js';
 
 let editor = null;
 let editorContent = '';
 let currentMode = null;
+let currentModeId = null;
 let saveTimeout = null;
 let modes = [];
 
@@ -21,6 +30,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   searchInput = document.getElementById('search-input');
   searchCount = document.getElementById('search-count');
   
+  // 检查并自动迁移数据
+  const needsMigration = await autoCheckAndMigrate();
+  if (needsMigration) {
+    console.log('等待数据迁移完成...');
+    return; // 迁移完成后会自动刷新页面
+  }
+  
   // 加载模式和内容
   await loadModesAndContent();
   
@@ -35,13 +51,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 // 加载模式列表和内容
 async function loadModesAndContent() {
   try {
-    const wordModes = await window.electronAPI.store.get('wordModes') || [
-      { id: 'default', name: '默认', words: [], notes: '' }
-    ];
-    const currentWordMode = await window.electronAPI.store.get('currentWordMode') || wordModes[0];
+    // 从 IndexedDB 获取所有模式
+    modes = await getAllModes();
     
-    modes = wordModes;
-    currentMode = currentWordMode;
+    if (modes.length === 0) {
+      console.warn('没有找到模式');
+      return;
+    }
+    
+    // 获取当前模式 ID
+    currentModeId = await window.electronAPI.store.get('currentModeId');
+    
+    if (!currentModeId || !modes.find(m => m.id === currentModeId)) {
+      // 如果没有或无效，使用第一个模式
+      currentModeId = modes[0].id;
+      await window.electronAPI.store.set('currentModeId', currentModeId);
+    }
+    
+    // 加载当前模式
+    currentMode = await getMode(currentModeId);
     
     // 加载笔记内容
     loadNoteContent();
@@ -137,19 +165,17 @@ async function switchToMode(mode) {
     // 先保存当前笔记
     await saveNoteContent();
     
-    // 重新从 store 获取最新的模式列表（包含刚保存的笔记）
-    const wordModes = await window.electronAPI.store.get('wordModes') || [];
-    const targetMode = wordModes.find(m => m.id === mode.id);
+    // 切换模式
+    currentModeId = mode.id;
+    currentMode = await getMode(currentModeId);
     
-    if (!targetMode) {
+    if (!currentMode) {
       console.error('目标模式不存在');
       return;
     }
     
-    // 切换模式
-    currentMode = targetMode;
-    modes = wordModes; // 更新全局 modes 列表
-    await window.electronAPI.store.set('currentWordMode', targetMode);
+    // 保存当前模式 ID
+    await window.electronAPI.store.set('currentModeId', currentModeId);
     
     // 加载新模式的笔记
     loadNoteContent();
@@ -162,9 +188,9 @@ async function switchToMode(mode) {
     document.getElementById('mode-dropdown').style.display = 'none';
     
     // 显示通知
-    showNotification(`已切换到：${targetMode.name}`);
+    showNotification(`已切换到：${currentMode.name}`);
     
-    console.log('切换到模式:', targetMode.name);
+    console.log('切换到模式:', currentMode.name);
   } catch (error) {
     console.error('切换模式失败:', error);
   }
@@ -740,23 +766,20 @@ function insertElementAtCursor(element) {
 
 async function saveNoteContent() {
   try {
-    if (!currentMode) return;
+    if (!currentMode || !currentModeId) return;
     
     // 确保获取最新的编辑器内容（包括格式化修改）
     editorContent = editor.innerHTML;
     
-    const wordModes = await window.electronAPI.store.get('wordModes') || [];
-    const modeIndex = wordModes.findIndex(m => m.id === currentMode.id);
+    // 更新模式的笔记内容
+    await updateMode(currentModeId, {
+      notes: editorContent
+    });
     
-    if (modeIndex !== -1) {
-      wordModes[modeIndex].notes = editorContent;
-      await window.electronAPI.store.set('wordModes', wordModes);
-      
-      currentMode.notes = editorContent;
-      await window.electronAPI.store.set('currentWordMode', currentMode);
-      
-      console.log('笔记已自动保存');
-    }
+    // 更新本地缓存
+    currentMode.notes = editorContent;
+    
+    console.log('笔记已自动保存');
   } catch (error) {
     console.error('保存失败:', error);
   }
