@@ -38,16 +38,30 @@ function htmlToPlain(html) {
 // 初始化
 document.addEventListener("DOMContentLoaded", async () => {
   // 检查并自动迁移数据
-  const needsMigration = await autoCheckAndMigrate();
-  if (needsMigration) {
-    console.log('等待数据迁移完成...');
-    return; // 迁移完成后会自动刷新页面
+  const migrated = await window.electronAPI.store.get('migrated_to_indexeddb');
+  if (!migrated) {
+    console.log('🔄 检测到需要迁移数据...');
+    const { migrateFromElectronStore, markMigrationComplete: markComplete } = await import('./src/migrate.js');
+    try {
+      const result = await migrateFromElectronStore();
+      if (result.success) {
+        console.log('✅ 迁移完成，刷新页面...');
+        window.location.reload();
+      } else {
+        console.error('❌ 迁移失败:', result.error);
+        alert('数据迁移失败: ' + result.error);
+      }
+    } catch (error) {
+      console.error('❌ 迁移异常:', error);
+      alert('数据迁移异常: ' + error.message);
+    }
+    return;
   }
   
   await loadModes();
   await showClipboard();
   setupEventListeners();
-  updateHistoryList();
+  await updateHistoryList();
   
   // 默认焦点在搜索框
   setTimeout(() => {
@@ -61,7 +75,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     await loadModes();
     await showClipboard();
-    updateHistoryList();
+    await updateHistoryList();
     // 焦点回到搜索框
     setTimeout(() => {
       document.getElementById("search-input")?.focus();
@@ -254,7 +268,7 @@ async function loadModes() {
       currentMode.words = await getWordsByMode(currentModeId);
     }
     
-    updateModeSidebar();
+  updateModeSidebar();
   } catch (error) {
     console.error('加载模式失败:', error);
   }
@@ -777,7 +791,7 @@ async function switchToMode(mode) {
   updateModeSidebar();
   clearSearch();
   selectedItemIndex = -1;
-  updateHistoryList();
+  await updateHistoryList();
   updatePreview();
   showStatus(`已切换到模式：${mode.name}`);
   
@@ -795,13 +809,13 @@ async function switchToMode(mode) {
 }
 
 // 显示全局历史记录
-function showAllHistory() {
+async function showAllHistory() {
   isAllHistoryMode = true;
   currentMode = null;
   updateModeSidebar();
   clearSearch();
   selectedItemIndex = -1;
-  updateHistoryList();
+  await updateHistoryList();
   updatePreview();
   showStatus("已切换到全局历史记录");
   // 焦点回到搜索框
@@ -1116,25 +1130,27 @@ function updateSearchUI() {
 
 // ==================== 历史记录列表管理 ====================
 
-function updateHistoryList() {
+async function updateHistoryList() {
   let words = [];
   
   if (isAllHistoryMode) {
     // 全局历史记录：合并所有模式的单词
     const allWords = [];
-    modes.forEach(mode => {
-      if (mode.words && mode.words.length > 0) {
-        mode.words.forEach(word => {
-          if (!allWords.includes(word)) {
+    for (const mode of modes) {
+      const modeWords = await getWordsByMode(mode.id);
+      if (modeWords && modeWords.length > 0) {
+        modeWords.forEach(word => {
+          if (!allWords.find(w => JSON.stringify(w) === JSON.stringify(word))) {
             allWords.push(word);
           }
         });
       }
-    });
+    }
     words = allWords;
   } else {
-  if (!currentMode) return;
-    words = currentMode.words || [];
+    if (!currentMode) return;
+    // 从 IndexedDB 加载当前模式的 words
+    words = await getWordsByMode(currentMode.id) || [];
   }
   
   // 过滤搜索结果
