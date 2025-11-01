@@ -5,7 +5,7 @@ import {
   getMode, 
   saveMode as saveM, 
   updateMode, 
-  deleteMode,
+  deleteMode as deleteModeFromDB,
   getWordsByMode, 
   saveWord as saveW, 
   deleteWord, 
@@ -990,14 +990,19 @@ async function deleteMode(mode) {
     return;
   }
 
+  // 从数据库删除模式
+  await deleteModeFromDB(mode.id);
+  
+  // 更新本地数组
   modes = modes.filter((m) => m.id !== mode.id);
 
+  // 如果删除的是当前模式，切换到第一个模式
   if (currentMode && currentMode.id === mode.id) {
     isAllHistoryMode = false;
     currentMode = modes[0];
+    currentModeId = currentMode.id;
   }
 
-  await saveModes();
   updateModeSidebar();
   selectedItemIndex = -1;
   updateHistoryList();
