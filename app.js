@@ -2143,11 +2143,26 @@ function closeImportDialog() {
 async function clearCurrentModeInDialog() {
   if (!currentMode) return;
   
-  if (confirm(`确定要清空模式"${currentMode.name}"下的所有内容吗？`)) {
-    await clearWords(currentMode.id);
+  // 保存当前模式信息，防止confirm对话框触发focus事件导致模式切换
+  const targetModeId = currentMode.id;
+  const targetModeName = currentMode.name;
+  
+  if (confirm(`确定要清空模式"${targetModeName}"下的所有内容吗？`)) {
+    await clearWords(targetModeId);
+    
+    // 确保还在目标模式
+    if (currentMode.id !== targetModeId) {
+      const targetMode = modes.find(m => m.id === targetModeId);
+      if (targetMode) {
+        currentMode = targetMode;
+        currentModeId = targetModeId;
+        updateModeSidebar();
+      }
+    }
+    
     await updateHistoryList();
     updatePreview();
-    showStatus(`已清空模式"${currentMode.name}"`);
+    showStatus(`已清空模式"${targetModeName}"`);
   }
 }
 
@@ -2179,6 +2194,10 @@ function handleFileImport(e) {
 
 async function importWords(text) {
   if (!currentMode) return;
+  
+  // 保存当前模式ID，防止在alert触发focus事件时被改变
+  const targetModeId = currentMode.id;
+  const targetModeName = currentMode.name;
 
   // 按空行分隔内容（连续的换行符）
   // 先统一换行符格式，然后按两个或更多换行符分隔
@@ -2189,19 +2208,19 @@ async function importWords(text) {
     .filter((word) => word.length > 0);
 
   if (newWords.length === 0) {
-    alert("没有找到有效的内容");
+    showStatus("没有找到有效的内容");
     return;
   }
 
   // 从 IndexedDB 读取现有数据
-  const existingWords = await getWordsByMode(currentMode.id);
+  const existingWords = await getWordsByMode(targetModeId);
   const wordsToAdd = newWords.filter((word) => !existingWords.some(w => 
     typeof w === 'string' ? w === word : w.content === word
   ));
   const duplicateCount = newWords.length - wordsToAdd.length;
 
   if (wordsToAdd.length === 0) {
-    alert("所有内容都已存在于当前模式中");
+    showStatus("所有内容都已存在于当前模式中");
     return;
   }
 
@@ -2212,17 +2231,27 @@ async function importWords(text) {
       content: word,
       createdAt: Date.now()
     };
-    await saveW(currentMode.id, itemToSave);
+    await saveW(targetModeId, itemToSave);
   }
 
-  let message = `成功导入 ${wordsToAdd.length} 条新内容到模式"${currentMode.name}"`;
+  let message = `成功导入 ${wordsToAdd.length} 条新内容到模式"${targetModeName}"`;
   if (duplicateCount > 0) {
     message += `，跳过 ${duplicateCount} 条重复内容`;
   }
-  alert(message);
 
   closeImportDialog();
   selectedItemIndex = 0;
+  
+  // 确保还在目标模式，如果不在则切换回去
+  if (currentMode.id !== targetModeId) {
+    const targetMode = modes.find(m => m.id === targetModeId);
+    if (targetMode) {
+      currentMode = targetMode;
+      currentModeId = targetModeId;
+      updateModeSidebar();
+    }
+  }
+  
   await updateHistoryList();
   updatePreview();
   showStatus(message);
