@@ -314,8 +314,22 @@ async function loadModes() {
     // 获取当前模式 ID
     currentModeId = await getSetting('currentModeId');
     
+    // 如果 IndexedDB 中没有 currentModeId，尝试从 electron-store 迁移
+    if (!currentModeId) {
+      try {
+        const oldModeId = await window.electronAPI.store.get('currentModeId');
+        if (oldModeId) {
+          console.log('🔄 从 electron-store 迁移 currentModeId:', oldModeId);
+          await setSetting('currentModeId', oldModeId);
+          currentModeId = oldModeId;
+        }
+      } catch (e) {
+        console.warn('无法从 electron-store 读取 currentModeId:', e);
+      }
+    }
+    
     if (!currentModeId || !modes.find(m => m.id === currentModeId)) {
-      // 如果没有或无效，使用第一个模式
+      // 如果还是没有或无效，使用第一个模式
       currentModeId = modes[0].id;
       await setSetting('currentModeId', currentModeId);
     }
