@@ -137,9 +137,19 @@ async function switchToMode(mode) {
     // 先保存当前笔记
     await saveNoteContent();
     
+    // 重新从 store 获取最新的模式列表（包含刚保存的笔记）
+    const wordModes = await window.electronAPI.store.get('wordModes') || [];
+    const targetMode = wordModes.find(m => m.id === mode.id);
+    
+    if (!targetMode) {
+      console.error('目标模式不存在');
+      return;
+    }
+    
     // 切换模式
-    currentMode = mode;
-    await window.electronAPI.store.set('currentWordMode', mode);
+    currentMode = targetMode;
+    modes = wordModes; // 更新全局 modes 列表
+    await window.electronAPI.store.set('currentWordMode', targetMode);
     
     // 加载新模式的笔记
     loadNoteContent();
@@ -152,9 +162,9 @@ async function switchToMode(mode) {
     document.getElementById('mode-dropdown').style.display = 'none';
     
     // 显示通知
-    showNotification(`已切换到：${mode.name}`);
+    showNotification(`已切换到：${targetMode.name}`);
     
-    console.log('切换到模式:', mode.name);
+    console.log('切换到模式:', targetMode.name);
   } catch (error) {
     console.error('切换模式失败:', error);
   }
@@ -165,6 +175,31 @@ async function switchToMode(mode) {
 function setupEventListeners() {
   // 编辑器输入事件
   editor.addEventListener('input', handleEditorInput);
+  
+  // 监听格式化操作（如 Cmd+B 加粗等）
+  // 这些操作可能不触发 input 事件，所以额外监听
+  editor.addEventListener('keydown', (e) => {
+    // 检测格式化快捷键
+    if ((e.metaKey || e.ctrlKey) && ['b', 'i', 'u'].includes(e.key.toLowerCase())) {
+      // 延迟一点点让格式化完成
+      setTimeout(() => {
+        handleEditorInput();
+      }, 10);
+    }
+  });
+  
+  // 使用 MutationObserver 监听 DOM 变化（捕获所有格式修改）
+  const observer = new MutationObserver(() => {
+    handleEditorInput();
+  });
+  
+  observer.observe(editor, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeOldValue: true
+  });
   
   // 占位符处理
   editor.addEventListener('focus', () => {
@@ -706,6 +741,9 @@ function insertElementAtCursor(element) {
 async function saveNoteContent() {
   try {
     if (!currentMode) return;
+    
+    // 确保获取最新的编辑器内容（包括格式化修改）
+    editorContent = editor.innerHTML;
     
     const wordModes = await window.electronAPI.store.get('wordModes') || [];
     const modeIndex = wordModes.findIndex(m => m.id === currentMode.id);
