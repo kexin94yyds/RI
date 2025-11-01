@@ -43,12 +43,12 @@ body {
 .sidebar {
   width: 140px;
   min-width: 140px;
-  background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: white;
+  border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 .sidebar-header {
@@ -69,100 +69,182 @@ body {
   width: 100%;
   padding: 12px 10px;
   margin-bottom: 6px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: white;
+  cursor: move;
   transition: all 0.2s ease;
   font-size: 13px;
   font-weight: 500;
-  color: #495057;
+  color: #333;
   text-align: center;
   position: relative;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   -webkit-app-region: no-drag;
 }
 
+.sidebar-item:active {
+  cursor: grabbing;
+}
+
+/* 拖拽状态 */
+.sidebar-item.dragging {
+  opacity: 0.5;
+}
+
+/* 插入位置提示 */
+.sidebar-item.insert-before {
+  border-top: 3px solid #1a73e8 !important;
+  z-index: 5;
+}
+
+.sidebar-item.insert-after {
+  border-bottom: 3px solid #1a73e8 !important;
+  z-index: 5;
+}
+
+/* 拖拽进行时禁用文本选择，避免抖动 */
+body.no-select, body.no-select * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .sidebar-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-  transform: translateX(2px);
-  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.15);
-  color: #667eea;
+  background: #f5f5f5;
+  border-color: #333;
+  transform: none;
+  box-shadow: none;
+  color: #000;
 }
 
 .sidebar-item.active {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   color: white;
-  box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+  border-color: #000;
+  box-shadow: none;
 }
 
 .sidebar-item.all-history {
-  background: linear-gradient(135deg, rgba(255, 152, 0, 0.1) 0%, rgba(255, 193, 7, 0.1) 100%);
-  border: 2px solid rgba(255, 152, 0, 0.3);
-  color: #f57c00;
+  background: white;
+  border: 1px solid #333;
+  color: #333;
   font-weight: 600;
 }
 
 .sidebar-item.all-history:hover {
-  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(255, 193, 7, 0.15) 100%);
-  border-color: rgba(255, 152, 0, 0.5);
-  color: #e65100;
+  background: #f5f5f5;
+  border-color: #000;
+  color: #000;
 }
 
 .sidebar-item.all-history.active {
-  background: linear-gradient(135deg, #ff9800 0%, #ffc107 100%);
+  background: #000;
   color: white;
-  border-color: #ff9800;
-  box-shadow: 0 3px 10px rgba(255, 152, 0, 0.3);
+  border-color: #000;
+  box-shadow: none;
 }
 
 .sidebar-item.add-mode {
-  background: rgba(76, 175, 80, 0.1);
-  border: 2px dashed rgba(76, 175, 80, 0.4);
-  color: #4caf50;
+  background: white;
+  border: 1px dashed #999;
+  color: #666;
   font-weight: 600;
 }
 
 .sidebar-item.add-mode:hover {
-  background: rgba(76, 175, 80, 0.15);
-  border-color: rgba(76, 175, 80, 0.6);
+  background: #f5f5f5;
+  border-color: #333;
+  color: #000;
 }
 
-/* 模式操作按钮 */
-.mode-actions {
+/* 右键菜单样式 */
+.context-menu {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  padding: 6px;
+  min-width: 160px;
+  z-index: 10000;
   display: none;
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  gap: 2px;
-  flex-direction: column;
 }
 
-.sidebar-item:not(.add-mode):not(.active):hover .mode-actions {
+.context-menu.show {
+  display: block;
+  animation: contextMenuFadeIn 0.15s ease;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.context-menu-item {
   display: flex;
-}
-
-.mode-action-btn {
-  padding: 2px 6px;
-  font-size: 10px;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  border: none;
-  border-radius: 3px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  font-size: 13px;
+  color: #333;
+  gap: 10px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.mode-action-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
+.context-menu-item:hover {
+  background: #f5f5f5;
+  color: #000;
 }
 
-.mode-action-btn.delete {
-  background: rgba(244, 67, 54, 0.8);
+.context-menu-item.danger {
+  color: #dc3545;
 }
 
-.mode-action-btn.delete:hover {
-  background: rgba(244, 67, 54, 1);
+.context-menu-item.danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: #c82333;
+}
+
+.context-menu-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+/* 模式内联编辑输入框 */
+.mode-edit-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  text-align: center;
+  outline: none;
+  box-shadow: none;
+  transition: all 0.2s ease;
+}
+
+.mode-edit-input:focus {
+  border-color: #000;
+  box-shadow: none;
 }
 
 /* ==================== 中间历史记录面板 ==================== */
@@ -201,8 +283,8 @@ body {
 }
 
 .search-input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #333;
+  box-shadow: none;
   background: white;
 }
 
@@ -231,7 +313,7 @@ body {
 /* 剪贴板预览区 */
 .clipboard-preview {
   padding: 12px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+  background: #f9f9f9;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -262,9 +344,9 @@ body {
 .clipboard-save-btn {
   width: 100%;
   padding: 8px;
-  border: none;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: 1px solid #333;
+  border-radius: 4px;
+  background: #000;
   color: white;
   font-size: 13px;
   font-weight: 600;
@@ -273,8 +355,9 @@ body {
 }
 
 .clipboard-save-btn:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  transform: translateY(-1px);
+  background: #333;
+  box-shadow: none;
+  transform: none;
 }
 
 /* 历史记录列表区 */
@@ -302,15 +385,15 @@ body {
 
 .history-item:hover {
   background: white;
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.12);
-  transform: translateX(4px);
+  border-color: #333;
+  box-shadow: none;
+  transform: none;
 }
 
 .history-item.active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  background: #f5f5f5;
+  border-color: #000;
+  box-shadow: none;
 }
 
 .history-item-text {
@@ -328,14 +411,14 @@ body {
 .history-item-edit-input {
   width: 100%;
   padding: 4px 8px;
-  border: 2px solid #667eea;
+  border: 1px solid #333;
   border-radius: 4px;
   font-size: 13px;
   font-family: inherit;
   line-height: 1.5;
   outline: none;
   background: white;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: none;
 }
 
 .history-item-time {
@@ -406,20 +489,22 @@ body {
 
 .action-btn {
   padding: 8px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   background: white;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  color: #333;
 }
 
 .action-btn:hover {
-  background: rgba(102, 126, 234, 0.05);
-  border-color: #667eea;
-  transform: translateY(-1px);
+  background: #f5f5f5;
+  border-color: #333;
+  transform: none;
+  color: #000;
 }
 
 .preview-content-area {
@@ -561,27 +646,30 @@ body {
 
 .preview-btn {
   padding: 10px 20px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   background: white;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
+  color: #333;
 }
 
 .preview-btn:hover {
-  background: rgba(102, 126, 234, 0.05);
-  border-color: #667eea;
+  background: #f5f5f5;
+  border-color: #333;
+  color: #000;
 }
 
 .preview-btn.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   color: white;
-  border: none;
+  border-color: #000;
 }
 
 .preview-btn.primary:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  background: #333;
+  box-shadow: none;
 }
 
 .preview-btn.danger {
@@ -606,17 +694,19 @@ body {
 
 .footer-btn {
   padding: 10px 18px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
   background: white;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
+  color: #333;
 }
 
 .footer-btn:hover {
-  background: rgba(102, 126, 234, 0.05);
-  border-color: #667eea;
+  background: #f5f5f5;
+  border-color: #333;
+  color: #000;
 }
 
 .footer-btn.danger-btn {
@@ -745,8 +835,8 @@ body {
 }
 
 .input-group input:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #333;
+  box-shadow: none;
 }
 
 .import-textarea {
@@ -763,8 +853,8 @@ body {
 }
 
 .import-textarea:focus {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #333;
+  box-shadow: none;
 }
 
 .review-word {
@@ -772,9 +862,10 @@ body {
   font-weight: 500;
   text-align: center;
   padding: 40px 20px;
-  color: #333;
-  background: rgba(102, 126, 234, 0.05);
-  border-radius: 8px;
+  color: #000;
+  background: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
   margin-bottom: 20px;
   min-height: 120px;
   display: flex;
@@ -793,8 +884,7 @@ body {
 .btn-primary,
 .btn-secondary {
   padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -802,22 +892,27 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
   color: white;
+  border: 1px solid #000;
 }
 
 .btn-primary:hover {
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  transform: translateY(-1px);
+  background: #333;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-secondary {
-  background: rgba(0, 0, 0, 0.05);
+  background: white;
   color: #333;
+  border: 1px solid #e0e0e0;
 }
 
 .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: #f5f5f5;
+  border-color: #333;
+  color: #000;
 }
 
 /* ==================== 滚动条样式 ==================== */

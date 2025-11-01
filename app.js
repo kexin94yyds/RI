@@ -11,6 +11,7 @@ let selectedItemIndex = -1;
 let isAllHistoryMode = false; // 是否在全局历史记录模式
 let editingItemIndex = -1; // 正在编辑的列表项索引
 let originalItemText = ""; // 列表项编辑前的原始文本
+let __dragActive = false; // 当前是否处于拖拽中（调试用）
 
 // HTML -> 纯文本（用于搜索、标题、复制）
 function htmlToPlain(html) {
@@ -34,6 +35,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // 当窗口重新获得焦点时，刷新数据
   window.addEventListener("focus", async () => {
+    if (typeof dndLog === 'function') {
+      try { dndLog('[window] focus', { dragActive: __dragActive, activeEl: document.activeElement && document.activeElement.tagName }); } catch (_) {}
+    }
     await loadModes();
     await showClipboard();
     updateHistoryList();
@@ -41,6 +45,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => {
       document.getElementById("search-input")?.focus();
     }, 50);
+  });
+  window.addEventListener('blur', () => {
+    if (typeof dndLog === 'function') {
+      try { dndLog('[window] blur', { dragActive: __dragActive }); } catch (_) {}
+    }
   });
 
   // 测试钩子
@@ -218,6 +227,14 @@ function updateModeSidebar() {
   if (!sidebar) return;
 
   sidebar.innerHTML = "";
+  if (DEBUG_DND) {
+    const cs = getComputedStyle(sidebar);
+    dndLog('sidebar ready', { 
+      overflowY: cs.overflowY, 
+      position: cs.position, 
+      zIndex: cs.zIndex 
+    });
+  }
   
   // 更新全局历史按钮状态
   if (allHistoryBtn) {
@@ -228,45 +245,475 @@ function updateModeSidebar() {
     }
   }
 
-  modes.forEach((mode) => {
+  modes.forEach((mode, index) => {
     const modeItem = document.createElement("button");
     modeItem.className = `sidebar-item ${!isAllHistoryMode && mode.id === currentMode?.id ? "active" : ""}`;
     modeItem.textContent = mode.name;
+    modeItem.setAttribute("data-mode-id", mode.id);
+    modeItem.setAttribute("data-mode-index", index);
     
-    // 添加操作按钮
+    // 不使用原生 DnD
+    // modeItem.setAttribute("draggable", "true");
+    if (DEBUG_DND) dndLog('attach item', { id: mode.id, name: mode.name, draggable: false });
+    
+    // 左键点击切换模式（拖拽完成后的 click 将被抑制）
+    modeItem.addEventListener("click", (e) => {
+      if (modeItem.querySelector('input')) return; // 编辑中不切换
+      if (__mouseDrag && (__mouseDrag.active || __mouseDrag.justDropped)) {
+        __mouseDrag.justDropped = false; // 吃掉拖拽后的 click
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      switchToMode(mode);
+    });
+
+    // 右键点击显示菜单（仅当模式数量大于1时）
     if (modes.length > 1) {
-      const actions = document.createElement("div");
-      actions.className = "mode-actions";
-      actions.innerHTML = `
-        <button class="mode-action-btn" data-action="edit">编辑</button>
-        <button class="mode-action-btn delete" data-action="delete">删除</button>
-      `;
-      modeItem.appendChild(actions);
+      modeItem.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        showContextMenu(e, mode);
+      });
     }
 
-    // 切换模式
-    modeItem.addEventListener("click", (e) => {
-      if (!e.target.classList.contains("mode-action-btn")) {
-        switchToMode(mode);
-      }
-    });
-
-    // 编辑和删除按钮
-    const actionButtons = modeItem.querySelectorAll(".mode-action-btn");
-    actionButtons.forEach(btn => {
-      btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-        const action = btn.getAttribute("data-action");
-        if (action === "edit") {
-      editMode(mode);
-        } else if (action === "delete") {
-      deleteMode(mode);
-        }
-      });
-    });
+    // 自定义鼠标拖拽采用容器委托（避免个别按钮未绑定时只能拖当前选中项）
 
     sidebar.appendChild(modeItem);
   });
+  if (DEBUG_DND) dndLog('sidebar items attached', { count: modes.length });
+  bindSidebarMouseDnDDelegation();
+}
+
+// 拖拽相关变量
+let __dragModeId = null; // 仅旧的 HTML5 DnD 逻辑使用（保留以防回退）
+let __dragGhostEl = null; // 仅旧的 HTML5 DnD 逻辑使用
+let HIDE_NATIVE_DRAG_IMAGE = true; // 运行时调试
+let DEBUG_DND = true; // 运行时调试
+let __mouseDrag = { active: false, modeId: null, ghostEl: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0, _targetId: null, _before: false, justDropped: false };
+
+function dndLog(...args) {
+  if (DEBUG_DND) console.log('[DND]', ...args);
+}
+
+function handleDragStart(e) {
+  // 如果正在编辑，禁止拖拽
+  const button = e.currentTarget || e.target;
+  if (button.querySelector('input')) {
+    e.preventDefault();
+    return;
+  }
+  
+  __dragModeId = button.getAttribute("data-mode-id");
+  button.classList.add('dragging');
+  __dragActive = true;
+  try {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', __dragModeId);
+    // 在 macOS/Electron 环境下，系统 dragImage 可能显示在窗口后面。
+    // 这里改为“隐藏”预览，完全不显示系统幽灵，避免视觉混淆。
+    if (HIDE_NATIVE_DRAG_IMAGE) {
+      const cv = document.createElement('canvas');
+      cv.width = 1;
+      cv.height = 1;
+      cv.style.position = 'absolute';
+      cv.style.top = '-10000px';
+      cv.style.left = '-10000px';
+      document.body.appendChild(cv);
+      __dragGhostEl = cv;
+      try { e.dataTransfer.setDragImage(cv, 0, 0); } catch (_) {}
+    }
+    const rect = button.getBoundingClientRect();
+    dndLog('dragstart', {
+      modeId: __dragModeId,
+      hideNative: HIDE_NATIVE_DRAG_IMAGE,
+      rect: { x: rect.x, y: rect.y, w: rect.width, h: rect.height }
+    });
+  } catch (_) {}
+}
+
+function handleDragEnd(e) {
+  __dragModeId = null;
+  const button = e.currentTarget || e.target;
+  button.classList.remove('dragging');
+  clearInsertClasses();
+  __dragActive = false;
+  dndLog('dragend', { modeId: __dragModeId });
+  // 清理自定义 drag 预览
+  if (__dragGhostEl && __dragGhostEl.parentNode) {
+    __dragGhostEl.parentNode.removeChild(__dragGhostEl);
+  }
+  __dragGhostEl = null;
+}
+
+function handleDragOver(e) {
+  const button = e.currentTarget || e.target;
+  const modeId = button.getAttribute("data-mode-id");
+  if (!__dragModeId || __dragModeId === modeId) return;
+  
+  e.preventDefault();
+  const rect = button.getBoundingClientRect();
+  const before = (e.clientY - rect.top) < rect.height / 2;
+  
+  button.classList.toggle('insert-before', before);
+  button.classList.toggle('insert-after', !before);
+  
+  try { 
+    e.dataTransfer.dropEffect = 'move'; 
+  } catch (_) {}
+
+  // 仅在状态变化时打印，避免刷屏
+  if (button.__lastBefore !== before) {
+    dndLog('dragover', { targetModeId: modeId, before, clientY: e.clientY, rectTop: rect.top, rectH: rect.height });
+    button.__lastBefore = before;
+  }
+}
+
+function handleDragLeave(e) {
+  const button = e.currentTarget || e.target;
+  button.classList.remove('insert-before', 'insert-after');
+  if (button.__lastBefore !== undefined) {
+    dndLog('dragleave', { targetModeId: button.getAttribute('data-mode-id') });
+    delete button.__lastBefore;
+  }
+}
+
+function handleDrop(e) {
+  const button = e.currentTarget || e.target;
+  const targetModeId = button.getAttribute("data-mode-id");
+  if (!__dragModeId || __dragModeId === targetModeId) return;
+  
+  e.preventDefault();
+  const rect = button.getBoundingClientRect();
+  const before = (e.clientY - rect.top) < rect.height / 2;
+  
+  const fromIdx = modes.findIndex(m => m.id === __dragModeId);
+  const toIdxBase = modes.findIndex(m => m.id === targetModeId);
+  
+  if (fromIdx === -1 || toIdxBase === -1) return;
+  
+  let insertIdx = before ? toIdxBase : toIdxBase + 1;
+  // 调整因移除后的索引偏移
+  if (fromIdx < insertIdx) insertIdx -= 1;
+  
+  dndLog('drop', { fromIdx, toIdxBase, insertIdx, before, dragModeId: __dragModeId, targetModeId });
+  moveModeToIndex(__dragModeId, insertIdx);
+  __dragModeId = null;
+  clearInsertClasses();
+  __dragActive = false;
+  // 清理自定义 drag 预览
+  if (__dragGhostEl && __dragGhostEl.parentNode) {
+    __dragGhostEl.parentNode.removeChild(__dragGhostEl);
+  }
+  __dragGhostEl = null;
+}
+
+// ==================== 自定义鼠标拖拽（替代原生 HTML5 DnD） ====================
+let __sidebarDnDBound = false;
+function bindSidebarMouseDnDDelegation() {
+  if (__sidebarDnDBound) return;
+  const sb = document.getElementById('modes-sidebar');
+  if (!sb) return;
+  sb.addEventListener('mousedown', (ev) => {
+    const btn = ev.target && ev.target.closest && ev.target.closest('#modes-sidebar .sidebar-item');
+    if (!btn) return;
+    const id = btn.getAttribute('data-mode-id');
+    startModeMouseDrag(ev, btn, id);
+  }, true); // 捕获，尽量早拦截
+  __sidebarDnDBound = true;
+}
+
+function startModeMouseDrag(ev, button, modeId) {
+  if (ev.button !== 0) return; // 仅左键
+  if (button.querySelector('input')) return; // 编辑中禁止
+  ev.preventDefault(); // 避免立即触发焦点/选中
+  const rect0 = button.getBoundingClientRect();
+  __mouseDrag = { active: false, modeId, ghostEl: null, startX: ev.clientX, startY: ev.clientY, offsetX: ev.clientX - rect0.left, offsetY: ev.clientY - rect0.top, _targetId: null, _before: false, justDropped: false };
+  const moveThreshold = 3;
+
+  const begin = (e) => {
+    if (__mouseDrag.active) return;
+    __mouseDrag.active = true;
+    document.body.classList.add('no-select');
+    const rect = button.getBoundingClientRect();
+    const ghost = button.cloneNode(true);
+    ghost.style.position = 'fixed';
+    ghost.style.left = rect.left + 'px';
+    ghost.style.top = rect.top + 'px';
+    ghost.style.width = rect.width + 'px';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.zIndex = '10000';
+    ghost.classList.add('dragging');
+    document.body.appendChild(ghost);
+    __mouseDrag.ghostEl = ghost;
+    dndLog('mouseDrag begin', { modeId });
+  };
+
+  const onMove = (e) => {
+    if (!__mouseDrag.active) {
+      const dx = Math.abs(e.clientX - __mouseDrag.startX);
+      const dy = Math.abs(e.clientY - __mouseDrag.startY);
+      if (dx < moveThreshold && dy < moveThreshold) return;
+      begin(e);
+    }
+    const g = __mouseDrag.ghostEl;
+    if (g) {
+      g.style.left = (e.clientX - __mouseDrag.offsetX) + 'px';
+      g.style.top = (e.clientY - __mouseDrag.offsetY) + 'px';
+    }
+    const sb = document.getElementById('modes-sidebar');
+    if (!sb) return;
+    const sbRect = sb.getBoundingClientRect();
+    const margin = 20, speed = 10;
+    if (e.clientY < sbRect.top + margin) sb.scrollTop -= speed;
+    else if (e.clientY > sbRect.bottom - margin) sb.scrollTop += speed;
+
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    let targetBtn = el && el.closest && el.closest('#modes-sidebar .sidebar-item');
+    clearInsertClasses();
+    if (targetBtn) {
+      const rect = targetBtn.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      targetBtn.classList.toggle('insert-before', before);
+      targetBtn.classList.toggle('insert-after', !before);
+      __mouseDrag._targetId = targetBtn.getAttribute('data-mode-id');
+      __mouseDrag._before = before;
+      dndLog('mouseDrag over', { target: __mouseDrag._targetId, before });
+    } else {
+      __mouseDrag._targetId = null;
+    }
+  };
+
+  const cleanup = () => {
+    document.removeEventListener('mousemove', onMove, true);
+    document.removeEventListener('mouseup', onUp, true);
+    document.body.classList.remove('no-select');
+    if (__mouseDrag.ghostEl && __mouseDrag.ghostEl.parentNode) {
+      __mouseDrag.ghostEl.parentNode.removeChild(__mouseDrag.ghostEl);
+    }
+  };
+
+  const onUp = (e) => {
+    if (__mouseDrag.active) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const wasActive = __mouseDrag.active;
+    const dragId = __mouseDrag.modeId;
+    const targetId = __mouseDrag._targetId;
+    const before = __mouseDrag._before;
+    cleanup();
+    clearInsertClasses();
+    __mouseDrag.active = false;
+    if (!wasActive) return; // 只是点击，不是拖拽
+    __mouseDrag.justDropped = true; // 抑制紧随其后的 click
+    if (!dragId || !targetId || dragId === targetId) return;
+    const fromIdx = modes.findIndex(m => m.id === dragId);
+    const toIdxBase = modes.findIndex(m => m.id === targetId);
+    if (fromIdx === -1 || toIdxBase === -1) return;
+    let insertIdx = before ? toIdxBase : toIdxBase + 1;
+    if (fromIdx < insertIdx) insertIdx -= 1;
+    dndLog('mouseDrag drop', { dragId, targetId, insertIdx, before });
+    moveModeToIndex(dragId, insertIdx);
+  };
+
+  document.addEventListener('mousemove', onMove, true);
+  document.addEventListener('mouseup', onUp, true);
+}
+// 全局/容器级调试日志：帮助定位 dragover 是否到达页面
+if (typeof window !== 'undefined') {
+  // 运行时调试开关
+  window.__dndDebug = window.__dndDebug || {};
+  window.__dndDebug.setHideNative = (v) => { HIDE_NATIVE_DRAG_IMAGE = !!v; console.log('[DND] set HIDE_NATIVE_DRAG_IMAGE =', HIDE_NATIVE_DRAG_IMAGE); };
+  window.__dndDebug.enableLogs = (v) => { DEBUG_DND = !!v; console.log('[DND] set DEBUG_DND =', DEBUG_DND); };
+  // 全局允许拖放（通过在 document 上 preventDefault）
+  (function(){
+    let enabled = false;
+    const onDocDragOver = (e) => { e.preventDefault(); if (DEBUG_DND) dndLog('[doc] dragover(pd)', { x: e.clientX, y: e.clientY }); };
+    const onDocDrop = (e) => { e.preventDefault(); if (DEBUG_DND) dndLog('[doc] drop(pd)', { x: e.clientX, y: e.clientY }); };
+    window.__dndDebug.enableGlobalAllowDrop = (v) => {
+      const want = !!v;
+      if (want === enabled) { console.log('[DND] globalAllowDrop already', enabled); return; }
+      enabled = want;
+      if (enabled) {
+        document.addEventListener('dragover', onDocDragOver);
+        document.addEventListener('drop', onDocDrop);
+        console.log('[DND] globalAllowDrop = true');
+      } else {
+        document.removeEventListener('dragover', onDocDragOver);
+        document.removeEventListener('drop', onDocDrop);
+        console.log('[DND] globalAllowDrop = false');
+      }
+    };
+  })();
+
+  // 文档级（捕获）
+  document.addEventListener('dragstart', (e) => {
+    if (DEBUG_DND) dndLog('[doc] dragstart', { tag: e.target && e.target.tagName, x: e.clientX, y: e.clientY });
+  }, true);
+  // 节流后的 drag 事件（源元素持续触发），帮助判断拖拽是否真的在进行
+  let lastDragTs = 0;
+  document.addEventListener('drag', (e) => {
+    const now = Date.now();
+    if (!DEBUG_DND) return;
+    if (now - lastDragTs > 100) {
+      dndLog('[doc] drag', { x: e.clientX, y: e.clientY, tag: e.target && e.target.tagName });
+      lastDragTs = now;
+    }
+  }, true);
+  document.addEventListener('dragover', (e) => {
+    if (DEBUG_DND) dndLog('[doc] dragover', { tag: e.target && e.target.tagName, x: e.clientX, y: e.clientY, defaultPrevented: e.defaultPrevented });
+  }, true);
+  document.addEventListener('drop', (e) => {
+    if (DEBUG_DND) dndLog('[doc] drop', { tag: e.target && e.target.tagName, x: e.clientX, y: e.clientY });
+  }, true);
+  document.addEventListener('dragend', (e) => {
+    if (DEBUG_DND) dndLog('[doc] dragend', {});
+  }, true);
+
+  // 侧边栏容器级（捕获）
+  const bindSidebarDnDLogs = () => {
+    const sb = document.getElementById('modes-sidebar');
+    if (!sb) return;
+    sb.addEventListener('dragenter', (e) => {
+      if (DEBUG_DND) dndLog('[sidebar] dragenter', { tag: e.target && e.target.tagName });
+    }, true);
+    sb.addEventListener('dragover', (e) => {
+      if (DEBUG_DND) dndLog('[sidebar] dragover', { tag: e.target && e.target.tagName });
+    }, true);
+    sb.addEventListener('dragleave', (e) => {
+      if (DEBUG_DND) dndLog('[sidebar] dragleave', { tag: e.target && e.target.tagName });
+    }, true);
+    sb.addEventListener('drop', (e) => {
+      if (DEBUG_DND) dndLog('[sidebar] drop', { tag: e.target && e.target.tagName });
+    }, true);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindSidebarDnDLogs);
+  } else {
+    bindSidebarDnDLogs();
+  }
+
+  // 全局抑制拖拽后的 click 冒泡一次，防止误切换
+  document.addEventListener('click', (e) => {
+    if (__mouseDrag && __mouseDrag.justDropped) {
+      e.preventDefault();
+      e.stopPropagation();
+      __mouseDrag.justDropped = false;
+      dndLog('suppress click after drop');
+    }
+  }, true);
+}
+
+// DnD 辅助函数
+function clearInsertClasses() {
+  const sidebar = document.getElementById("modes-sidebar");
+  if (sidebar) {
+    sidebar.querySelectorAll('button.insert-before, button.insert-after')
+      .forEach((b) => { 
+        b.classList.remove('insert-before', 'insert-after'); 
+      });
+  }
+}
+
+async function moveModeToIndex(modeId, targetIdx) {
+  const currentOrder = modes.slice();
+  const fromIdx = currentOrder.findIndex(m => m.id === modeId);
+  
+  if (fromIdx === -1) return;
+  
+  // 移除当前位置的模式
+  const [movedMode] = currentOrder.splice(fromIdx, 1);
+  
+  // 插入到目标位置
+  if (targetIdx < 0) targetIdx = 0;
+  if (targetIdx > currentOrder.length) targetIdx = currentOrder.length;
+  currentOrder.splice(targetIdx, 0, movedMode);
+  
+  // 更新全局 modes
+  modes = currentOrder;
+  
+  // 保存并重新渲染
+  await saveModes();
+  updateModeSidebar();
+  showStatus("模式顺序已更新");
+}
+
+// 右键菜单相关代码
+let contextMenu = null;
+
+function createContextMenu() {
+  if (contextMenu) return contextMenu;
+  
+  contextMenu = document.createElement("div");
+  contextMenu.className = "context-menu";
+  contextMenu.innerHTML = `
+    <div class="context-menu-item" data-action="edit">
+      <span class="context-menu-icon">✏️</span>
+      <span>编辑</span>
+    </div>
+    <div class="context-menu-item danger" data-action="delete">
+      <span class="context-menu-icon">🗑️</span>
+      <span>删除</span>
+    </div>
+  `;
+  document.body.appendChild(contextMenu);
+  
+  // 点击菜单外部关闭
+  document.addEventListener("click", () => {
+    hideContextMenu();
+  });
+  
+  return contextMenu;
+}
+
+function showContextMenu(e, mode) {
+  const menu = createContextMenu();
+  
+  // 移除之前的事件监听器
+  const items = menu.querySelectorAll(".context-menu-item");
+  items.forEach(item => {
+    const newItem = item.cloneNode(true);
+    item.parentNode.replaceChild(newItem, item);
+  });
+  
+  // 添加新的事件监听器
+  menu.querySelectorAll(".context-menu-item").forEach(item => {
+    item.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const action = item.getAttribute("data-action");
+      
+      if (action === "edit") {
+        editMode(mode);
+      } else if (action === "delete") {
+        deleteMode(mode);
+      }
+      
+      hideContextMenu();
+    });
+  });
+  
+  // 定位菜单
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
+  menu.classList.add("show");
+  
+  // 确保菜单不会超出窗口
+  setTimeout(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = (window.innerWidth - rect.width - 10) + "px";
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = (window.innerHeight - rect.height - 10) + "px";
+    }
+  }, 0);
+}
+
+function hideContextMenu() {
+  if (contextMenu) {
+    contextMenu.classList.remove("show");
+  }
 }
 
 async function switchToMode(mode) {
@@ -323,18 +770,95 @@ function showAddModeDialog() {
 }
 
 function editMode(mode) {
-  isAddingMode = false;
-  editingModeId = mode.id;
-  const titleEl = document.getElementById("mode-dialog-title");
-  const inputEl = document.getElementById("mode-name-input");
-  const dialogEl = document.getElementById("mode-dialog");
-  if (titleEl) titleEl.textContent = "编辑模式";
-  if (inputEl) inputEl.value = mode.name;
-  if (dialogEl) dialogEl.style.display = "flex";
-  if (inputEl) {
-    inputEl.focus();
-    inputEl.select();
-  }
+  // 直接在侧边栏项上进行内联编辑
+  const modeItem = document.querySelector(`[data-mode-id="${mode.id}"]`);
+  if (!modeItem) return;
+  
+  // 如果已经在编辑，不重复创建
+  if (modeItem.querySelector('input')) return;
+  
+  const originalName = mode.name;
+  
+  // 创建输入框
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = mode.name;
+  input.className = 'mode-edit-input';
+  input.setAttribute('data-original-name', originalName);
+  
+  // 替换文本内容
+  modeItem.textContent = '';
+  modeItem.appendChild(input);
+  
+  // 聚焦并选中文本
+  input.focus();
+  input.select();
+  
+  // 保存函数
+  const saveModeEdit = async () => {
+    const newName = input.value.trim();
+    
+    // 如果名称没有改变，直接恢复
+    if (newName === originalName) {
+      modeItem.textContent = originalName;
+      return;
+    }
+    
+    // 检查是否为空
+    if (!newName) {
+      showStatus("模式名称不能为空");
+      modeItem.textContent = originalName;
+      return;
+    }
+    
+    // 检查是否重名
+    const isDuplicate = modes.some((m) => m.id !== mode.id && m.name === newName);
+    if (isDuplicate) {
+      showStatus("模式名称已存在");
+      modeItem.textContent = originalName;
+      return;
+    }
+    
+    // 更新模式名称
+    const modeIndex = modes.findIndex((m) => m.id === mode.id);
+    if (modeIndex !== -1) {
+      modes[modeIndex].name = newName;
+      if (currentMode && currentMode.id === mode.id) {
+        currentMode.name = newName;
+      }
+      await saveModes();
+      updateModeSidebar();
+      updateHistoryList();
+      showStatus(`已更新模式名称：${newName}`);
+    }
+  };
+  
+  // 取消编辑函数
+  const cancelModeEdit = () => {
+    modeItem.textContent = originalName;
+  };
+  
+  // 键盘事件
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      saveModeEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelModeEdit();
+    }
+  });
+  
+  // 失去焦点时保存
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (modeItem.querySelector('input')) {
+        saveModeEdit();
+      }
+    }, 100);
+  });
 }
 
 function closeModeDialog() {
@@ -1630,6 +2154,13 @@ function handleKeyboardNavigation(e) {
     return;
   }
   
+  // Tab键切换模式
+  if (e.key === "Tab") {
+    e.preventDefault();
+    switchToNextMode(e.shiftKey);
+    return;
+  }
+  
   // 对于搜索框，只处理删除快捷键（已在 handleSearchKeyDown 中处理）
   // 其他快捷键不处理，让搜索框正常工作
   if (e.target.id === "search-input") {
@@ -1675,6 +2206,43 @@ function handleKeyboardNavigation(e) {
       }
     }
   }
+}
+
+// Tab键切换模式
+async function switchToNextMode(reverse = false) {
+  if (modes.length === 0) return;
+  
+  // 如果在全局历史记录模式，切换到第一个模式
+  if (isAllHistoryMode) {
+    await switchToMode(modes[0]);
+    return;
+  }
+  
+  // 找到当前模式的索引
+  const currentIndex = modes.findIndex(m => m.id === currentMode?.id);
+  if (currentIndex === -1) {
+    await switchToMode(modes[0]);
+    return;
+  }
+  
+  // 计算下一个模式的索引
+  let nextIndex;
+  if (reverse) {
+    // Shift+Tab 向上切换
+    nextIndex = currentIndex - 1;
+    if (nextIndex < 0) {
+      nextIndex = modes.length - 1;
+    }
+  } else {
+    // Tab 向下切换
+    nextIndex = currentIndex + 1;
+    if (nextIndex >= modes.length) {
+      nextIndex = 0;
+    }
+  }
+  
+  await switchToMode(modes[nextIndex]);
+  showStatus(`已切换到模式：${modes[nextIndex].name}`);
 }
 
 // ==================== 列表项内编辑 ====================
