@@ -103,12 +103,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             createdAt: Date.now()
           });
           
-          window.electronAPI.sendNotification('已保存', displayText);
+          window.electronAPI.sendNotification('已保存', `${displayText}\n模式：${currentMode.name}`);
           
           // 刷新列表
           await updateHistoryList();
         } else {
-          window.electronAPI.sendNotification('提示', '内容已存在');
+          window.electronAPI.sendNotification('提示', `内容已存在\n模式：${currentMode.name}`);
         }
       } catch (error) {
         console.error('快速保存失败:', error);
@@ -2036,12 +2036,12 @@ async function saveWord() {
     itemToSave.createdAt = Date.now();
     await saveW(currentMode.id, itemToSave);
     
-    showStatus("已保存：" + displayText);
+    showStatus(`已保存：${displayText} | 模式：${currentMode.name}`);
     selectedItemIndex = 0;
     await updateHistoryList();
     updatePreview();
   } else {
-    showStatus("内容已存在");
+    showStatus(`内容已存在 | 模式：${currentMode.name}`);
   }
 }
 
