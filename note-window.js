@@ -4,7 +4,9 @@ import {
   getAllModes, 
   getMode,
   updateMode,
-  getNotesByMode 
+  getNotesByMode,
+  getWordsByMode,
+  saveWord 
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
 
@@ -458,22 +460,28 @@ async function saveCombinedNoteEntry() {
     const plain = htmlToPlainTextForNote(content).trim();
     if (!content || plain.length === 0) return;
 
-    const wordModes = await window.electronAPI.store.get('wordModes') || [];
-    let cm = await window.electronAPI.store.get('currentWordMode');
-    if (!cm && wordModes.length) cm = wordModes[0];
-    if (!cm) return;
+    if (!currentMode || !currentModeId) return;
 
-    const modeIndex = wordModes.findIndex(m => m.id === cm.id);
-    if (modeIndex === -1) return;
-
+    // 从 IndexedDB 获取当前模式的所有记录
+    const list = await getWordsByMode(currentModeId);
+    
     // 如果最近一条已是相同 html，则不重复添加
-    const list = wordModes[modeIndex].words || [];
-    const duplicate = list.length > 0 && typeof list[0] === 'object' && list[0].type === 'rich' && list[0].html === content;
+    const duplicate = list.length > 0 && 
+                     typeof list[0] === 'object' && 
+                     list[0].type === 'rich' && 
+                     list[0].html === content;
+    
     if (!duplicate) {
-      const entry = { type: 'rich', html: content, createdAt: Date.now() };
-      wordModes[modeIndex].words = [entry, ...list];
-      await window.electronAPI.store.set('wordModes', wordModes);
-      await window.electronAPI.store.set('currentWordMode', wordModes[modeIndex]);
+      const entry = { 
+        type: 'rich', 
+        html: content,
+        content: plain, // 添加纯文本内容用于搜索
+        createdAt: Date.now() 
+      };
+      
+      // 保存到 IndexedDB
+      await saveWord(currentModeId, entry);
+      console.log('✅ 笔记已保存到 IndexedDB');
     }
   } catch (err) {
     console.error('保存图文合一笔记失败:', err);
