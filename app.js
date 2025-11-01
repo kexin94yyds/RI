@@ -1549,16 +1549,17 @@ async function handlePreviewTextBlur() {
     return;
   }
 
-  const words = currentMode.words;
-  const originalIndex = words.findIndex(w => {
+  // 从 IndexedDB 读取并更新
+  const words = await getWordsByMode(currentMode.id);
+  const wordToUpdate = words.find(w => {
     const normalized = (typeof w === 'string') ? { type: 'text', content: w } : w;
     return normalized.content === originalWord;
   });
   
-  if (originalIndex !== -1) {
+  if (wordToUpdate) {
     // 检查新内容是否已存在（排除当前项）
-    const isDuplicate = words.some((w, index) => {
-      if (index === originalIndex) return false;
+    const isDuplicate = words.some((w) => {
+      if (JSON.stringify(w) === JSON.stringify(wordToUpdate)) return false;
       const normalized = (typeof w === 'string') ? { type: 'text', content: w } : w;
       return normalized.content === newWord;
     });
@@ -1570,27 +1571,19 @@ async function handlePreviewTextBlur() {
     }
     
     // 更新内容
-    if (typeof words[originalIndex] === 'string') {
-      words[originalIndex] = newWord;
-    } else {
-      words[originalIndex].content = newWord;
-    }
+    const updatedWord = {
+      ...wordToUpdate,
+      content: newWord,
+      type: 'text'
+    };
 
-    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-    if (modeIndex !== -1 && currentMode) {
-      modes[modeIndex] = currentMode;
+    // 保存到 IndexedDB（先删除再添加）
+    if (wordToUpdate.id) {
+      await deleteWord(wordToUpdate.id);
     }
-
-    await saveModes();
+    await saveW(currentMode.id, updatedWord);
     
-    // 更新 filteredWords
-    if (typeof filteredWords[selectedItemIndex] === 'string') {
-      filteredWords[selectedItemIndex] = newWord;
-    } else {
-      filteredWords[selectedItemIndex].content = newWord;
-    }
-    
-    updateHistoryList();
+    await updateHistoryList();
     showStatus("已自动保存");
   }
 }
@@ -1621,35 +1614,27 @@ async function handleRichEditorSave(richEditor) {
     return;
   }
 
-  const words = currentMode.words;
-  const originalIndex = words.findIndex(w => {
-    const normalized = (typeof w === 'string') ? { type: 'text', content: w } : w;
-    return normalized.type === 'rich' && normalized.html === originalHtml;
+  // 从 IndexedDB 读取并更新
+  const words = await getWordsByMode(currentMode.id);
+  const wordToUpdate = words.find(w => {
+    return w.type === 'rich' && w.html === originalHtml;
   });
   
-  if (originalIndex !== -1) {
+  if (wordToUpdate && wordToUpdate.id) {
     // 更新内容
-    if (typeof words[originalIndex] === 'object' && words[originalIndex].type === 'rich') {
-      words[originalIndex].html = newHtml;
-    }
+    const updatedWord = {
+      ...wordToUpdate,
+      html: newHtml
+    };
 
-    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-    if (modeIndex !== -1 && currentMode) {
-      modes[modeIndex] = currentMode;
-    }
-
-    await saveModes();
-    
-    // 更新 filteredWords
-    if (typeof filteredWords[selectedItemIndex] === 'object' && 
-        filteredWords[selectedItemIndex].type === 'rich') {
-      filteredWords[selectedItemIndex].html = newHtml;
-    }
+    // 保存到 IndexedDB（先删除再添加）
+    await deleteWord(wordToUpdate.id);
+    await saveW(currentMode.id, updatedWord);
     
     // 更新 data-original 属性
     richEditor.setAttribute('data-original', newHtml);
     
-    updateHistoryList();
+    await updateHistoryList();
     showStatus("笔记已自动保存");
   }
 }
@@ -1859,21 +1844,27 @@ window.deleteCurrentItem = async function() {
 async function deleteContentItem(word) {
   if (!currentMode) return;
 
-  currentMode.words = currentMode.words.filter((w) => w !== word);
-
-    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-  if (modeIndex !== -1 && currentMode) {
-      modes[modeIndex] = currentMode;
+  // 从 IndexedDB 删除
+  try {
+    // 找到要删除的 word 的 ID
+    const allWords = await getWordsByMode(currentMode.id);
+    const wordToDelete = allWords.find(w => JSON.stringify(w) === JSON.stringify(word));
+    
+    if (wordToDelete && wordToDelete.id) {
+      await deleteWord(wordToDelete.id);
     }
-
-    await saveModes();
+  } catch (error) {
+    console.error('删除条目失败:', error);
+    showStatus('删除失败');
+    return;
+  }
   
   // 调整选中索引
   if (selectedItemIndex >= filteredWords.length - 1) {
     selectedItemIndex = Math.max(0, filteredWords.length - 2);
   }
   
-  updateHistoryList();
+  await updateHistoryList();
   updatePreview();
 }
 
@@ -1915,8 +1906,9 @@ async function saveWord() {
     displayText = text.length > 20 ? text.substring(0, 20) + "..." : text;
   }
 
-  // 检查是否已存在（简单的对比）
-  const isDuplicate = currentMode.words.some(word => {
+  // 检查是否已存在（从 IndexedDB 读取）
+  const existingWords = await getWordsByMode(currentMode.id);
+  const isDuplicate = existingWords.some(word => {
     if (typeof word === 'string') {
       return word === itemToSave.content;
     }
@@ -1932,17 +1924,13 @@ async function saveWord() {
   });
 
   if (!isDuplicate) {
-    currentMode.words.unshift(itemToSave); // 添加到开头
-
-    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-    if (modeIndex !== -1) {
-      modes[modeIndex] = currentMode;
-    }
-
-    await saveModes();
+    // 保存到 IndexedDB
+    itemToSave.createdAt = Date.now();
+    await saveW(currentMode.id, itemToSave);
+    
     showStatus("已保存：" + displayText);
     selectedItemIndex = 0;
-    updateHistoryList();
+    await updateHistoryList();
     updatePreview();
   } else {
     showStatus("内容已存在");
@@ -1965,10 +1953,11 @@ function showStatus(message) {
 let reviewWords = [];
 let currentReview = "";
 
-function startReview() {
+async function startReview() {
   if (!currentMode) return;
 
-  reviewWords = [...currentMode.words];
+  // 从 IndexedDB 加载
+  reviewWords = await getWordsByMode(currentMode.id);
   if (reviewWords.length === 0) {
     alert("当前模式下暂无内容可复习");
           return;
@@ -1995,19 +1984,19 @@ function showRandomReviewWord() {
 async function markAsRemembered() {
   if (!currentReview || !currentMode) return;
 
-  currentMode.words = currentMode.words.filter((w) => w !== currentReview);
+  // 从 IndexedDB 删除
+  const allWords = await getWordsByMode(currentMode.id);
+  const wordToDelete = allWords.find(w => JSON.stringify(w) === JSON.stringify(currentReview));
+  
+  if (wordToDelete && wordToDelete.id) {
+    await deleteWord(wordToDelete.id);
+  }
 
-          const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-  if (modeIndex !== -1) {
-            modes[modeIndex] = currentMode;
-          }
-
-          await saveModes();
   const reviewWordEl = document.getElementById("review-word");
   if (reviewWordEl) reviewWordEl.innerText = "已移除：" + currentReview;
-  setTimeout(() => {
+  setTimeout(async () => {
     showRandomReviewWord();
-    updateHistoryList();
+    await updateHistoryList();
     updatePreview();
   }, 800);
 }
@@ -2028,16 +2017,11 @@ async function clearAllWords() {
   if (!currentMode) return;
 
   if (confirm(`确定要清空当前模式"${currentMode.name}"下的所有内容吗？`)) {
-    currentMode.words = [];
-
-      const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-    if (modeIndex !== -1) {
-        modes[modeIndex] = currentMode;
-      }
-
-      await saveModes();
+    // 从 IndexedDB 清空所有数据
+    await clearWords(currentMode.id);
+    
     selectedItemIndex = -1;
-    updateHistoryList();
+    await updateHistoryList();
     updatePreview();
     showStatus("已清空当前模式的所有内容");
   }
@@ -2048,7 +2032,8 @@ async function clearAllWords() {
 async function exportTXT() {
   if (!currentMode) return;
 
-  const words = currentMode.words;
+  // 从 IndexedDB 读取数据
+  const words = await getWordsByMode(currentMode.id);
   if (words.length === 0) {
     alert(`当前模式"${currentMode.name}"下暂无内容可导出`);
     return;
@@ -2152,8 +2137,11 @@ async function importWords(text) {
     return;
   }
 
-  const existingWords = currentMode.words;
-  const wordsToAdd = newWords.filter((word) => !existingWords.includes(word));
+  // 从 IndexedDB 读取现有数据
+  const existingWords = await getWordsByMode(currentMode.id);
+  const wordsToAdd = newWords.filter((word) => !existingWords.some(w => 
+    typeof w === 'string' ? w === word : w.content === word
+  ));
   const duplicateCount = newWords.length - wordsToAdd.length;
 
   if (wordsToAdd.length === 0) {
@@ -2161,14 +2149,15 @@ async function importWords(text) {
     return;
   }
 
-  currentMode.words = [...wordsToAdd, ...existingWords];
-
-  const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-  if (modeIndex !== -1 && currentMode) {
-    modes[modeIndex] = currentMode;
+  // 批量保存到 IndexedDB
+  for (const word of wordsToAdd) {
+    const itemToSave = {
+      type: 'text',
+      content: word,
+      createdAt: Date.now()
+    };
+    await saveW(currentMode.id, itemToSave);
   }
-
-  await saveModes();
 
   let message = `成功导入 ${wordsToAdd.length} 条新内容到模式"${currentMode.name}"`;
   if (duplicateCount > 0) {
@@ -2402,25 +2391,32 @@ async function saveListItemEdit(newText) {
   
   const oldText = originalItemText;
   
-  // 在当前模式中查找并替换
-  const wordIndex = currentMode.words.indexOf(oldText);
-  if (wordIndex !== -1) {
-    currentMode.words[wordIndex] = newText;
+  // 从 IndexedDB 查找并更新
+  const allWords = await getWordsByMode(currentMode.id);
+  const wordToUpdate = allWords.find(w => {
+    if (typeof w === 'string') return w === oldText;
+    if (w.content) return w.content === oldText;
+    return false;
+  });
+  
+  if (wordToUpdate && wordToUpdate.id) {
+    // 更新内容
+    const updatedWord = {
+      ...wordToUpdate,
+      content: newText,
+      type: 'text'
+    };
     
-    // 更新 modes 数组
-    const modeIndex = modes.findIndex((mode) => mode.id === currentMode?.id);
-    if (modeIndex !== -1) {
-      modes[modeIndex] = currentMode;
-    }
-    
-    await saveModes();
+    // 保存更新（先删除再添加）
+    await deleteWord(wordToUpdate.id);
+    await saveW(currentMode.id, updatedWord);
     
     // 重置编辑状态
     editingItemIndex = -1;
     originalItemText = '';
     
     // 刷新显示
-    updateHistoryList();
+    await updateHistoryList();
     updatePreview();
     showStatus('内容已更新');
   } else {
