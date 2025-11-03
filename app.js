@@ -1794,36 +1794,13 @@ async function handleRichEditorImagePaste(richEditor, file) {
 }
 
 // 压缩图片（用于富文本编辑器）
-function compressImageForRichEditor(file, maxWidth = 800, maxHeight = 800, quality = 0.8) {
+function compressImageForRichEditor(file, maxWidth = 1920, maxHeight = 1920, quality = 0.95) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = (e) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width = Math.floor(width * ratio);
-          height = Math.floor(height * ratio);
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
-      };
-      
-      img.onerror = () => reject(new Error('图片加载失败'));
-      img.src = e.target.result;
+      // 直接返回原图，不进行任何压缩或缩放
+      resolve(e.target.result);
     };
     
     reader.onerror = () => reject(new Error('文件读取失败'));
