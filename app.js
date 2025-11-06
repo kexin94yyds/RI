@@ -66,6 +66,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   await showClipboard();
   setupEventListeners();
   await updateHistoryList();
+
+  // 初始化置顶按钮状态（若可用）
+  try {
+    const pinBtn = document.getElementById('pin-btn');
+    if (window.electronAPI && window.electronAPI.window && typeof window.electronAPI.window.isAlwaysOnTop === 'function') {
+      const pinned = await window.electronAPI.window.isAlwaysOnTop();
+      updatePinButton(pinned);
+      if (pinBtn) pinBtn.style.display = '';
+    } else {
+      if (pinBtn) pinBtn.style.display = 'none';
+    }
+  } catch (_) {
+    const pinBtn = document.getElementById('pin-btn');
+    if (pinBtn) pinBtn.style.display = 'none';
+  }
   
   // 监听来自主进程的快速保存请求
   if (window.electronAPI && window.electronAPI.ipcRenderer) {
@@ -281,6 +296,22 @@ function setupEventListeners() {
   document.getElementById("export-btn")?.addEventListener("click", exportTXT);
   document.getElementById("import-btn")?.addEventListener("click", showImportDialog);
 
+  // 置顶按钮
+  const pinBtn = document.getElementById("pin-btn");
+  if (pinBtn) {
+    pinBtn.addEventListener("click", async () => {
+      try {
+        if (!window.electronAPI || !window.electronAPI.window || typeof window.electronAPI.window.isAlwaysOnTop !== 'function') return;
+        const current = await window.electronAPI.window.isAlwaysOnTop();
+        const next = !current;
+        await window.electronAPI.window.setAlwaysOnTop(next);
+        updatePinButton(next);
+      } catch (e) {
+        console.error('切换置顶失败:', e);
+      }
+    });
+  }
+
   // 底部按钮
   document.getElementById("review-btn")?.addEventListener("click", startReview);
   document.getElementById("clear-all-btn")?.addEventListener("click", clearAllWords);
@@ -306,6 +337,14 @@ function setupEventListeners() {
 
   // 键盘导航
   document.addEventListener("keydown", handleKeyboardNavigation);
+}
+
+// 置顶按钮 UI 更新
+function updatePinButton(isPinned) {
+  const btn = document.getElementById('pin-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', !!isPinned);
+  btn.title = isPinned ? '取消置顶' : '置顶窗口';
 }
 
 // ==================== 模式管理 ====================

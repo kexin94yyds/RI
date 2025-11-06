@@ -510,6 +510,37 @@ body.no-select, body.no-select * {
   box-shadow: none;
 }
 
+/* 图标按钮（例如置顶） */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* 置顶按钮激活态 */
+.action-btn.active,
+.icon-btn.active {
+  background: #000; /* 黑色充满 */
+  color: #fff;
+  border-color: #000;
+}
+
+/* 置顶图标样式（黑白） */
+.icon-btn .pin-icon {
+  width: 20px; /* 与 ClipBook h-5 w-5 对齐 */
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+/* 旋转类，复用 Tailwind 的 rotate-45 语义 */
+.rotate-45 { transform: rotate(45deg); transform-origin: center; }
 .preview-content-area {
   flex: 1;
   padding: 0;

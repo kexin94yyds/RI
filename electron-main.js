@@ -43,16 +43,22 @@ async function showOnActiveSpace() {
   mainWindow.focus();
   lastShowAt = Date.now(); // 记录显示时间
   
-  // 200ms后还原，仅在当前 Space 可见
+  // 200ms后还原，仅在当前 Space 可见，并恢复用户置顶偏好
   setTimeout(() => {
     try { 
       mainWindow.setVisibleOnAllWorkspaces(false); 
+    } catch (_) {}
+    try {
+      const pinned = !!store.get('mainPinned');
+      mainWindow.setAlwaysOnTop(pinned, pinned ? 'floating' : undefined);
     } catch (_) {}
   }, 200);
 }
 
 // 创建主窗口
 function createWindow() {
+  const pinnedPref = store.get('mainPinned');
+  const initialPinned = typeof pinnedPref === 'boolean' ? pinnedPref : true;
   mainWindow = new BrowserWindow({
     width: 600,
     height: 600,
@@ -62,7 +68,7 @@ function createWindow() {
     frame: false, // 无边框
     resizable: true,
     transparent: true, // 启用透明
-    alwaysOnTop: true,
+    alwaysOnTop: initialPinned,
     skipTaskbar: false,
     hasShadow: true, // 窗口阴影
     roundedCorners: true, // 圆角
@@ -97,6 +103,11 @@ function createWindow() {
     // 刚显示后的短暂失焦（切 Space/全屏/层级切换）容易导致瞬间隐藏，需忽略
     const elapsed = Date.now() - lastShowAt;
     if (elapsed < 800) return; // 显示后 800ms 内忽略 blur 事件
+    // 若用户已置顶主窗口，则不自动隐藏
+    try {
+      const pinned = !!store.get('mainPinned');
+      if (pinned) return;
+    } catch (_) {}
     
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
@@ -742,6 +753,31 @@ ipcMain.handle('window-toggle', async () => {
       await showOnActiveSpace();
     }
   }
+});
+
+// IPC：主窗口置顶状态查询
+ipcMain.handle('main-get-always-on-top', async () => {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      return mainWindow.isAlwaysOnTop();
+    }
+  } catch (_) {}
+  return false;
+});
+
+// IPC：主窗口置顶状态设置并持久化
+ipcMain.handle('main-set-always-on-top', async (event, on) => {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const pinned = !!on;
+      mainWindow.setAlwaysOnTop(pinned, pinned ? 'floating' : undefined);
+      store.set('mainPinned', pinned);
+      return mainWindow.isAlwaysOnTop();
+    }
+  } catch (e) {
+    console.error('设置主窗口置顶失败:', e);
+  }
+  return false;
 });
 
 // IPC 处理：笔记窗口置顶控制

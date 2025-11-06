@@ -30,7 +30,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   window: {
     show: () => ipcRenderer.invoke('window-show'),
     hide: () => ipcRenderer.invoke('window-hide'),
-    toggle: () => ipcRenderer.invoke('window-toggle')
+    toggle: () => ipcRenderer.invoke('window-toggle'),
+    // 置顶状态控制
+    isAlwaysOnTop: () => ipcRenderer.invoke('main-get-always-on-top'),
+    setAlwaysOnTop: (on) => ipcRenderer.invoke('main-set-always-on-top', on)
   },
   
   // Shell API - 打开外部链接
@@ -81,4 +84,3 @@ contextBridge.exposeInMainWorld('electron', {
     }
   }
 });
-
