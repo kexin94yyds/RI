@@ -228,8 +228,15 @@
       outline: none;
       font-size: 14px;
       line-height: 1.6;
-      color: #333;
+      color: #333 !important; /* 强制设置文字颜色 */
+      -webkit-text-fill-color: #333 !important; /* Safari/Chrome 特殊处理 */
       -webkit-app-region: no-drag;
+    }
+    
+    /* 确保所有子元素继承颜色 */
+    .md-editor * {
+      color: inherit !important;
+      -webkit-text-fill-color: inherit !important;
     }
 
     .md-editor:empty:before {

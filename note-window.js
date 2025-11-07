@@ -67,8 +67,8 @@ window.addEventListener('beforeunload', async (e) => {
     // 立即保存
     await saveNoteContent();
     
-    // 强制保存到历史
-    await saveToHistoryForce();
+    // 仅当文本有差异时才保存到历史
+    await saveToHistory();
   } catch (error) {
     console.error('窗口关闭前保存失败:', error);
   }
@@ -219,12 +219,15 @@ async function switchToMode(mode) {
       return;
     }
     
-    // 先保存当前笔记
+    // 先保存当前笔记和历史记录
     if (saveTimeout) {
       clearTimeout(saveTimeout);
       saveTimeout = null;
     }
     await saveNoteContent();
+    
+    // 💾 切换模式前，保存到历史记录
+    await saveToHistory();
     
     // ✅ 从数据库重新加载完整的模式数据
     currentModeId = mode.id;
@@ -354,8 +357,8 @@ function setupEventListeners() {
         // 立即保存当前内容到模式
         await saveNoteContent();
         
-        // 强制保存到历史记录（隐藏时总是保存，作为备份点）
-        await saveToHistoryForce();
+        // 仅当文本有差异时才保存到历史记录（避免重复）
+        await saveToHistory();
         
         console.log('✅ 窗口隐藏前保存完成');
       } catch (error) {
@@ -516,8 +519,8 @@ async function closeWindow() {
     }
     await saveNoteContent();
     
-    // 强制保存到历史记录（关闭时总是保存）
-    await saveToHistoryForce();
+    // 仅当文本有差异时才保存到历史记录
+    await saveToHistory();
     
     // 清除定时器
     if (autoHistoryTimeout) {
@@ -945,8 +948,9 @@ async function saveToHistory() {
       return;
     }
     
-    // 检查内容是否有变化（避免重复保存相同内容）
-    if (lastHistorySavedContent === content) {
+  // 检查文本是否有变化（避免重复保存相同内容）
+  const lastPlain = htmlToPlainTextForNote(lastHistorySavedContent || '').trim();
+  if (lastPlain === plainText) {
       console.log('⏭️ 跳过保存：内容无变化');
       // 继续下一次定时
       startAutoHistorySave();

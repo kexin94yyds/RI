@@ -213,6 +213,12 @@ textarea:focus {
   scrollbar-color: transparent transparent; /* Firefox 默认隐藏 */
 }
 
+/* 确保所有子元素继承颜色 */
+.md-editor * {
+  color: inherit !important;
+  -webkit-text-fill-color: inherit !important;
+}
+
 /* 富文本编辑器内容样式 */
 .md-editor h1, .md-editor h2, .md-editor h3, .md-editor h4, .md-editor h5, .md-editor h6 {
   margin: 16px 0 8px 0;
