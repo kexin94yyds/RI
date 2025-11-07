@@ -67,10 +67,8 @@ window.addEventListener('beforeunload', async (e) => {
     // 立即保存
     await saveNoteContent();
     
-    // 如果有内容变化，保存到历史
-    if (editorContent && editorContent !== lastHistorySavedContent) {
-      await saveToHistory();
-    }
+    // 强制保存到历史
+    await saveToHistoryForce();
   } catch (error) {
     console.error('窗口关闭前保存失败:', error);
   }
@@ -356,10 +354,8 @@ function setupEventListeners() {
         // 立即保存当前内容到模式
         await saveNoteContent();
         
-        // 如果有内容变化，立即保存到历史记录
-        if (editorContent && editorContent !== lastHistorySavedContent) {
-          await saveToHistory();
-        }
+        // 强制保存到历史记录（隐藏时总是保存，作为备份点）
+        await saveToHistoryForce();
         
         console.log('✅ 窗口隐藏前保存完成');
       } catch (error) {
@@ -520,10 +516,8 @@ async function closeWindow() {
     }
     await saveNoteContent();
     
-    // 如果有内容变化，立即保存到历史记录
-    if (editorContent && editorContent !== lastHistorySavedContent) {
-      await saveToHistory();
-    }
+    // 强制保存到历史记录（关闭时总是保存）
+    await saveToHistoryForce();
     
     // 清除定时器
     if (autoHistoryTimeout) {
@@ -997,6 +991,54 @@ async function saveToHistory() {
     console.error('自动保存到历史记录失败:', error);
     // 出错后也继续定时
     startAutoHistorySave();
+  }
+}
+
+// 强制保存到历史记录（隐藏窗口时使用，跳过内容相同检查）
+async function saveToHistoryForce() {
+  try {
+    const content = editorContent || '';
+    const plainText = htmlToPlainTextForNote(content).trim();
+    
+    // 检查是否有内容
+    if (!content || plainText.length === 0) {
+      console.log('⏭️ 跳过保存：内容为空');
+      return;
+    }
+    
+    if (!currentMode || !currentModeId) {
+      console.log('⏭️ 跳过保存：模式未加载');
+      return;
+    }
+    
+    // 🔥 强制保存模式：即使内容相同也保存（作为隐藏时的备份点）
+    const entry = {
+      type: 'rich',
+      html: content,
+      content: plainText,
+      createdAt: Date.now()
+    };
+    
+    // 保存到 IndexedDB
+    await saveWord(currentModeId, entry);
+    
+    // 更新最后保存的内容
+    lastHistorySavedContent = content;
+    
+    console.log('✅ 已强制保存到历史记录（窗口隐藏）');
+    
+    // 显示保存提示
+    showAutoSaveNotification();
+    
+    // 通知主窗口刷新数据
+    if (window.electron && window.electron.ipcRenderer) {
+      window.electron.ipcRenderer.send('note-saved', {
+        modeId: currentModeId,
+        timestamp: Date.now()
+      });
+    }
+  } catch (error) {
+    console.error('强制保存到历史记录失败:', error);
   }
 }
 
