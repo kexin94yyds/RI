@@ -19,6 +19,11 @@ let currentModeId = null;
 let saveTimeout = null;
 let modes = [];
 
+// 自动历史记录保存
+let autoHistoryTimeout = null;
+let lastHistorySavedContent = '';
+const AUTO_HISTORY_INTERVAL = 120000; // 2分钟自动保存历史
+
 // 搜索相关变量
 let searchBox = null;
 let searchInput = null;
@@ -48,6 +53,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   
   console.log('笔记窗口初始化完成');
+});
+
+// 窗口关闭前保存
+window.addEventListener('beforeunload', async (e) => {
+  try {
+    // 取消待处理的保存
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    
+    // 立即保存
+    await saveNoteContent();
+    
+    // 如果有内容变化，保存到历史
+    if (editorContent && editorContent !== lastHistorySavedContent) {
+      await saveToHistory();
+    }
+  } catch (error) {
+    console.error('窗口关闭前保存失败:', error);
+  }
 });
 
 // ==================== 模式管理 ====================
@@ -107,12 +133,19 @@ function loadNoteContent() {
     editor.innerHTML = currentMode.notes;
     editorContent = currentMode.notes;
     editor.removeAttribute('data-placeholder');
-    console.log(`📝 已加载模式 "${currentMode.name}" 的笔记 (ID: ${currentMode.id}, 内容长度: ${currentMode.notes.length})`);
   } else {
     editor.innerHTML = '';
     editorContent = '';
     editor.setAttribute('data-placeholder', '在此输入内容或粘贴富文本...');
-    console.log(`📝 模式 "${currentMode?.name || '未知'}" 没有笔记内容，显示空白编辑器`);
+  }
+  
+  // 重置自动历史记录的追踪
+  lastHistorySavedContent = editorContent;
+  
+  // 清除旧的定时器，加载新内容后重新开始计时
+  if (autoHistoryTimeout) {
+    clearTimeout(autoHistoryTimeout);
+    autoHistoryTimeout = null;
   }
 }
 
@@ -182,36 +215,34 @@ function loadModesIntoDropdown() {
 // 切换到指定模式
 async function switchToMode(mode) {
   try {
-    const oldModeName = currentMode?.name || '(无)';
+    // 如果已经是当前模式，不需要切换
+    if (currentModeId === mode.id) {
+      document.getElementById('mode-dropdown').style.display = 'none';
+      return;
+    }
     
-    // 清除防抖定时器，立即保存当前笔记
+    // 先保存当前笔记
     if (saveTimeout) {
       clearTimeout(saveTimeout);
       saveTimeout = null;
     }
-    
-    // 确保保存最新的编辑器内容
     await saveNoteContent();
-    console.log(`✓ 已保存旧模式 "${oldModeName}" 的笔记`);
     
-    // 切换模式
+    // ✅ 从数据库重新加载完整的模式数据
     currentModeId = mode.id;
-    
-    // 从数据库重新加载新模式的完整数据（确保获取最新的 notes）
     currentMode = await getMode(currentModeId);
     
     if (!currentMode) {
-      console.error(`❌ 目标模式 ${currentModeId} 不存在`);
-      showNotification('模式不存在！', false);
+      console.error('目标模式不存在:', currentModeId);
+      showNotification('❌ 切换失败：模式不存在', false);
       return;
     }
     
-    // 保存当前模式 ID
+    // 保存当前模式 ID 到设置
     await setSetting('currentModeId', currentModeId);
     
     // 加载新模式的笔记
     loadNoteContent();
-    console.log(`✓ 已加载新模式 "${currentMode.name}" 的笔记，内容长度: ${currentMode.notes?.length || 0}`);
     
     // 更新显示
     updateTitle();
@@ -221,19 +252,12 @@ async function switchToMode(mode) {
     document.getElementById('mode-dropdown').style.display = 'none';
     
     // 显示通知
-    showNotification(`已切换到：${currentMode.name}`);
+    showNotification(`✓ 已切换到：${currentMode.name}`);
     
-    // 通知主窗口模式已切换
-    if (window.electron && window.electron.ipcRenderer) {
-      window.electron.ipcRenderer.send('mode-switched-from-note', {
-        modeId: currentModeId
-      });
-    }
-    
-    console.log(`🔄 切换完成: "${oldModeName}" → "${currentMode.name}"`);
+    console.log(`✓ 已从数据库加载模式 "${currentMode.name}" (ID: ${currentModeId})`);
   } catch (error) {
-    console.error('❌ 切换模式失败:', error);
-    showNotification('切换模式失败: ' + error.message, false);
+    console.error('切换模式失败:', error);
+    showNotification('❌ 切换失败: ' + error.message, false);
   }
 }
 
@@ -317,27 +341,41 @@ function setupEventListeners() {
   // 搜索相关事件
   setupSearchListeners();
   
-  // 窗口失去焦点时自动保存
-  window.addEventListener('blur', async () => {
-    if (saveTimeout) {
-      clearTimeout(saveTimeout);
-      saveTimeout = null;
-    }
-    await saveNoteContent();
-    console.log('窗口失去焦点，已自动保存');
-  });
-  
   // 监听主窗口的模式更新事件（IPC）
   if (window.electron && window.electron.ipcRenderer) {
+    // 监听窗口隐藏事件（在隐藏前保存）
+    window.electron.ipcRenderer.on('window-hiding', async () => {
+      console.log('📝 窗口即将隐藏，保存内容...');
+      try {
+        // 取消待处理的保存
+        if (saveTimeout) {
+          clearTimeout(saveTimeout);
+          saveTimeout = null;
+        }
+        
+        // 立即保存当前内容到模式
+        await saveNoteContent();
+        
+        // 如果有内容变化，立即保存到历史记录
+        if (editorContent && editorContent !== lastHistorySavedContent) {
+          await saveToHistory();
+        }
+        
+        console.log('✅ 窗口隐藏前保存完成');
+      } catch (error) {
+        console.error('窗口隐藏前保存失败:', error);
+      }
+    });
+    
     // 监听模式列表更新
     window.electron.ipcRenderer.on('modes-sync', async (data) => {
       console.log('📝 笔记窗口收到模式列表更新:', data);
       modes = data.modes || [];
       
-      // 重要：只更新模式列表，不改变当前正在编辑的模式
+      // ✅ 重要：只更新模式列表，不改变当前正在编辑的模式
       // 只有在接收到 mode-changed 事件时才真正切换模式
       
-      // 但需要更新当前模式的引用（保持最新数据）
+      // 但需要更新当前模式的引用（保持最新的模式名称等元数据）
       if (currentModeId) {
         const updatedCurrentMode = modes.find(m => m.id === currentModeId);
         if (updatedCurrentMode) {
@@ -348,48 +386,46 @@ function setupEventListeners() {
           }
           await saveNoteContent();
           
-          // 更新当前模式对象（但不重新加载笔记，保持正在编辑的内容）
-          currentMode = updatedCurrentMode;
-          console.log(`✓ 当前模式对象已更新: ${currentMode.name}`);
+          // ✅ 仅更新当前模式对象的元数据（名称等），不重新加载笔记内容
+          // 这样可以保持用户正在编辑的内容
+          currentMode = { ...currentMode, name: updatedCurrentMode.name };
+          console.log(`✓ 当前模式元数据已更新: ${currentMode.name}`);
         }
       }
       
       updateModeSwitcherDisplay();
+      console.log('✓ 模式列表已同步（不影响当前编辑内容）');
     });
     
     // 监听当前模式切换
     window.electron.ipcRenderer.on('mode-changed', async (data) => {
       console.log('📝 笔记窗口收到模式切换通知:', data);
-      if (data.mode) {
+      if (data.mode && data.mode.id !== currentModeId) {
         // 先保存当前笔记
         if (saveTimeout) {
           clearTimeout(saveTimeout);
           saveTimeout = null;
         }
         await saveNoteContent();
-        console.log(`✓ 已保存旧模式 ${currentMode?.name} 的笔记`);
         
-        // 切换到新模式
-        currentModeId = data.mode.id;
+        // ✅ 从数据库重新加载完整的模式数据（而不是使用主窗口传来的数据）
+        const newModeId = data.mode.id;
+        const newMode = await getMode(newModeId);
         
-        // 从数据库重新加载新模式的完整数据
-        currentMode = await getMode(currentModeId);
-        
-        if (!currentMode) {
-          console.error(`❌ 模式 ${currentModeId} 不存在`);
-          return;
+        if (newMode) {
+          currentModeId = newModeId;
+          currentMode = newMode;
+          await setSetting('currentModeId', currentModeId);
+          
+          // 加载新模式的笔记内容
+          loadNoteContent();
+          updateModeSwitcherDisplay();
+          updateTitle();
+          showNotification(`✓ 已切换到: ${newMode.name}`, true);
+          console.log(`✓ 已从数据库加载模式 "${newMode.name}" 的完整数据`);
+        } else {
+          console.error('无法从数据库加载模式:', newModeId);
         }
-        
-        // 保存当前模式 ID
-        await setSetting('currentModeId', currentModeId);
-        
-        // 加载新模式的笔记内容
-        loadNoteContent();
-        updateModeSwitcherDisplay();
-        updateTitle();
-        
-        console.log(`✓ 已切换到模式: ${currentMode.name}, 笔记内容长度: ${currentMode.notes?.length || 0}`);
-        showNotification(`✓ 已切换到: ${currentMode.name}`, true);
       }
     });
     
@@ -405,11 +441,14 @@ function handleEditorInput() {
   // 更新标题
   updateTitle();
   
-  // 自动保存（防抖）
+  // 自动保存到模式的 notes 字段（防抖）
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
     saveNoteContent();
   }, 500);
+  
+  // 启动自动历史记录保存定时器
+  startAutoHistorySave();
 }
 
 function handleKeyDown(e) {
@@ -474,16 +513,25 @@ function handleEditorClick(e) {
 // 关闭窗口
 async function closeWindow() {
   try {
-    // 关闭前清除防抖定时器并保存
+    // 关闭前确保保存当前内容
     if (saveTimeout) {
       clearTimeout(saveTimeout);
       saveTimeout = null;
     }
-    
-    // 保存当前内容
     await saveNoteContent();
     
-    console.log('窗口关闭前已保存内容');
+    // 如果有内容变化，立即保存到历史记录
+    if (editorContent && editorContent !== lastHistorySavedContent) {
+      await saveToHistory();
+    }
+    
+    // 清除定时器
+    if (autoHistoryTimeout) {
+      clearTimeout(autoHistoryTimeout);
+      autoHistoryTimeout = null;
+    }
+    
+    console.log('✅ 关闭前已保存所有内容');
   } catch (error) {
     console.error('关闭前保存失败:', error);
   } finally {
@@ -780,30 +828,45 @@ async function handleImageFile(file) {
     
     insertElementAtCursor(img);
     
-    // 立即更新并保存内容
-    editorContent = editor.innerHTML;
-    updateTitle();
+    handleEditorInput();
     
-    // 清除之前的防抖定时器，设置新的保存
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-      saveNoteContent();
-    }, 500);
-    
-    console.log('图片已插入并等待保存');
+    console.log('图片已插入');
   } catch (error) {
     console.error('处理图片失败:', error);
     showNotification('图片处理失败: ' + error.message, false);
   }
 }
 
-function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.95) {
+function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.8) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
     reader.onload = (e) => {
-      // 直接返回原图，不进行任何压缩或缩放
-      resolve(e.target.result);
+      const img = new Image();
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => reject(new Error('图片加载失败'));
+      img.src = e.target.result;
     };
     
     reader.onerror = () => reject(new Error('文件读取失败'));
@@ -842,15 +905,12 @@ function insertElementAtCursor(element) {
 
 async function saveNoteContent() {
   try {
-    if (!currentMode || !currentModeId) {
-      console.warn('⚠️ 无法保存：currentMode 或 currentModeId 为空');
-      return;
-    }
+    if (!currentMode || !currentModeId) return;
     
     // 确保获取最新的编辑器内容（包括格式化修改）
     editorContent = editor.innerHTML;
     
-    // 更新模式的笔记内容到数据库
+    // 更新模式的笔记内容
     await updateMode(currentModeId, {
       notes: editorContent
     });
@@ -858,10 +918,124 @@ async function saveNoteContent() {
     // 更新本地缓存
     currentMode.notes = editorContent;
     
-    console.log(`💾 已保存模式 "${currentMode.name}" 的笔记 (ID: ${currentModeId}, 内容长度: ${editorContent.length})`);
+    console.log('笔记已自动保存');
   } catch (error) {
-    console.error(`❌ 保存模式 "${currentMode?.name}" 的笔记失败:`, error);
+    console.error('保存失败:', error);
   }
+}
+
+// ==================== 自动历史记录保存 ====================
+
+// 启动自动历史记录保存定时器
+function startAutoHistorySave() {
+  // 清除之前的定时器
+  if (autoHistoryTimeout) {
+    clearTimeout(autoHistoryTimeout);
+  }
+  
+  // 设置新的定时器
+  autoHistoryTimeout = setTimeout(async () => {
+    await saveToHistory();
+  }, AUTO_HISTORY_INTERVAL);
+}
+
+// 保存当前内容到历史记录
+async function saveToHistory() {
+  try {
+    const content = editorContent || '';
+    const plainText = htmlToPlainTextForNote(content).trim();
+    
+    // 检查是否有内容
+    if (!content || plainText.length === 0) {
+      console.log('⏭️ 跳过保存：内容为空');
+      return;
+    }
+    
+    // 检查内容是否有变化（避免重复保存相同内容）
+    if (lastHistorySavedContent === content) {
+      console.log('⏭️ 跳过保存：内容无变化');
+      // 继续下一次定时
+      startAutoHistorySave();
+      return;
+    }
+    
+    if (!currentMode || !currentModeId) {
+      console.log('⏭️ 跳过保存：模式未加载');
+      return;
+    }
+    
+    // 创建历史记录条目
+    const entry = {
+      type: 'rich',
+      html: content,
+      content: plainText,
+      createdAt: Date.now()
+    };
+    
+    // 保存到 IndexedDB
+    await saveWord(currentModeId, entry);
+    
+    // 更新最后保存的内容
+    lastHistorySavedContent = content;
+    
+    console.log('✅ 已自动保存到历史记录');
+    
+    // 显示保存提示（不打扰用户，仅在右下角短暂提示）
+    showAutoSaveNotification();
+    
+    // 通知主窗口刷新数据
+    if (window.electron && window.electron.ipcRenderer) {
+      window.electron.ipcRenderer.send('note-saved', {
+        modeId: currentModeId,
+        timestamp: Date.now()
+      });
+    }
+    
+    // 继续下一次定时保存
+    startAutoHistorySave();
+  } catch (error) {
+    console.error('自动保存到历史记录失败:', error);
+    // 出错后也继续定时
+    startAutoHistorySave();
+  }
+}
+
+// 显示自动保存提示（轻量级，不打扰）
+function showAutoSaveNotification() {
+  const notification = document.createElement('div');
+  notification.className = 'auto-save-notification';
+  notification.textContent = '💾 已自动保存';
+  notification.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(52, 199, 89, 0.9);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // 淡入
+  setTimeout(() => {
+    notification.style.opacity = '1';
+  }, 10);
+  
+  // 1.5秒后淡出并移除
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 300);
+  }, 1500);
 }
 
 // ==================== 辅助函数 ====================

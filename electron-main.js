@@ -158,10 +158,21 @@ function createNoteWindow() {
   noteWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
-      // 保存窗口位置
-      const bounds = noteWindow.getBounds();
-      store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
-      noteWindow.hide();
+      
+      // 通知渲染进程窗口即将隐藏，让它保存内容
+      if (noteWindow && !noteWindow.isDestroyed()) {
+        noteWindow.webContents.send('window-hiding');
+      }
+      
+      // 稍微延迟一下再隐藏，确保保存完成
+      setTimeout(() => {
+        if (noteWindow && !noteWindow.isDestroyed()) {
+          // 保存窗口位置
+          const bounds = noteWindow.getBounds();
+          store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
+          noteWindow.hide();
+        }
+      }, 100);
     }
   });
 
@@ -407,7 +418,14 @@ app.whenReady().then(() => {
     try {
       if (noteWindow && !noteWindow.isDestroyed() && noteWindow.isVisible()) {
         console.log('隐藏笔记窗口');
-        noteWindow.hide();
+        // 通知渲染进程保存
+        noteWindow.webContents.send('window-hiding');
+        // 延迟隐藏，确保保存完成
+        setTimeout(() => {
+          if (noteWindow && !noteWindow.isDestroyed()) {
+            noteWindow.hide();
+          }
+        }, 100);
       } else {
         console.log('显示笔记窗口');
         showNoteWindow();
