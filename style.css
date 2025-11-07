@@ -387,6 +387,13 @@ body.no-select, body.no-select * {
   box-shadow: none;
 }
 
+.history-item.dragging {
+  opacity: 0.5;
+  cursor: move;
+  border-color: #4a90e2;
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(74, 144, 226, 0.05));
+}
+
 .history-item-text {
   font-size: 13px;
   line-height: 1.5;

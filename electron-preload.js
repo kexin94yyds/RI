@@ -40,6 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell-open-external', url)
   },
+
+  // 拖拽导出 API
+  drag: {
+    // 以 Markdown 文件形式开始拖拽
+    startMarkdownDrag: (content, fileName) => ipcRenderer.send('start-markdown-drag', { content, fileName })
+  },
   
   // 通知 API
   sendNotification: (title, body) => {
@@ -65,19 +71,19 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => {
       // 白名单允许的频道
-      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched', 'note-saved'];
+      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched', 'note-saved', 'start-markdown-drag'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }
     },
     on: (channel, func) => {
-      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item'];
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item', 'window-hiding'];
       if (validChannels.includes(channel)) {
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
     },
     removeListener: (channel, func) => {
-      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item'];
+      const validChannels = ['note-pin-changed', 'modes-sync', 'mode-changed', 'quick-save-item', 'window-hiding'];
       if (validChannels.includes(channel)) {
         ipcRenderer.removeListener(channel, func);
       }

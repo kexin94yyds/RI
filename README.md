@@ -15,6 +15,7 @@
 - **多格式支持**: 文本、图片、富文本、链接
 - **快速搜索**: 实时搜索历史记录
 - **拖拽排序**: 支持模式拖拽排序
+- **🆕 Markdown 拖拽**: 拖拽列表项自动转换为 Markdown 格式导出
 
 ### 📝 富文本笔记
 - **Markdown 支持**: 实时预览 Markdown 渲染
@@ -84,6 +85,12 @@ npm run build:mac
 - 支持 Markdown 语法
 - 可以粘贴图片
 - 点击置顶按钮固定窗口
+
+### 5. 拖拽导出 Markdown（新功能）
+- 将历史记录列表项拖拽到其他应用
+- 自动转换为 Markdown 格式
+- 支持拖拽到聊天软件、编辑器、笔记应用
+- 详细说明请查看 [MARKDOWN_DRAG_FEATURE.md](MARKDOWN_DRAG_FEATURE.md)
 
 ## 💻 开发
 

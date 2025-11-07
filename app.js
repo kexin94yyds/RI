@@ -39,6 +39,130 @@ function htmlToPlain(html) {
   return (div.textContent || div.innerText || '').trim();
 }
 
+// 将内容转换为 Markdown 格式
+function convertToMarkdown(normalized) {
+  if (!normalized) return '';
+  
+  // 纯文本内容
+  if (normalized.type === 'text') {
+    const content = normalized.content || '';
+    
+    // 检查是否是 URL
+    if (isURL(content)) {
+      return `[${content}](${normalizeURL(content)})`;
+    }
+    
+    // 检查是否是 dataURL 图片
+    if (typeof content === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(content)) {
+      return `![图片](${content})`;
+    }
+    
+    // 普通文本：检查是否包含换行，如果有多行则作为代码块
+    if (content.includes('\n')) {
+      return '```\n' + content + '\n```';
+    }
+    
+    return content;
+  }
+  
+  // 图片内容
+  if (normalized.type === 'image') {
+    const fileName = normalized.fileName || '图片';
+    const path = normalized.path || '';
+    
+    // 使用文件路径作为图片链接
+    if (path) {
+      return `![${fileName}](file://${path})`;
+    }
+    
+    return `[图片: ${fileName}]`;
+  }
+  
+  // 富文本内容
+  if (normalized.type === 'rich') {
+    const html = normalized.html || '';
+    
+    // 简单的 HTML 到 Markdown 转换
+    let markdown = html
+      // 移除 style 属性
+      .replace(/\s+style="[^"]*"/gi, '')
+      // 转换标题
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+      // 转换粗体和斜体
+      .replace(/<(strong|b)[^>]*>(.*?)<\/\1>/gi, '**$2**')
+      .replace(/<(em|i)[^>]*>(.*?)<\/\1>/gi, '*$2*')
+      // 转换链接
+      .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+      // 转换图片
+      .replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, '![$2]($1)')
+      .replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, '![图片]($1)')
+      // 转换列表
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+      .replace(/<ul[^>]*>/gi, '\n')
+      .replace(/<\/ul>/gi, '\n')
+      .replace(/<ol[^>]*>/gi, '\n')
+      .replace(/<\/ol>/gi, '\n')
+      // 转换段落
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+      // 转换换行
+      .replace(/<br\s*\/?>/gi, '\n')
+      // 转换代码
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+      .replace(/<pre[^>]*>(.*?)<\/pre>/gi, '```\n$1\n```')
+      // 移除其他 HTML 标签
+      .replace(/<[^>]+>/g, '')
+      // 解码 HTML 实体
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      // 清理多余的空行
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    
+    return markdown || htmlToPlain(html);
+  }
+  
+  // 默认返回空字符串
+  return '';
+}
+
+// 依据内容生成合适的 Markdown 文件名
+function generateMarkdownFileName(normalized) {
+  const ts = new Date();
+  const stamp = ts.getFullYear().toString() +
+    String(ts.getMonth() + 1).padStart(2, '0') +
+    String(ts.getDate()).padStart(2, '0') + '_' +
+    String(ts.getHours()).padStart(2, '0') +
+    String(ts.getMinutes()).padStart(2, '0') +
+    String(ts.getSeconds()).padStart(2, '0');
+
+  let base = 'export';
+  try {
+    if (normalized) {
+      if (normalized.type === 'text') {
+        base = (normalized.content || '').split('\n')[0].slice(0, 30);
+      } else if (normalized.type === 'rich') {
+        base = htmlToPlain(normalized.html || '').split('\n')[0].slice(0, 30) || 'note';
+      } else if (normalized.type === 'image') {
+        base = (normalized.fileName || 'image');
+      }
+    }
+  } catch (_) {}
+
+  base = (base || 'export')
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50) || 'export';
+
+  return `${base}_${stamp}.md`;
+}
+
 // 初始化
 document.addEventListener("DOMContentLoaded", async () => {
   // 检查并自动迁移数据
@@ -1382,6 +1506,9 @@ function createHistoryItem(word, index) {
   item.setAttribute("data-index", index);
   item.setAttribute("tabindex", "0");
   
+  // 启用拖拽功能
+  item.setAttribute("draggable", "true");
+  
   const normalized = (typeof word === 'string') ? { type: 'text', content: word } : word;
 
   const contentDiv = document.createElement("div");
@@ -1393,7 +1520,8 @@ function createHistoryItem(word, index) {
     contentDiv.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px;">
         <img src="file://${normalized.path}" 
-             style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" 
+             style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0; pointer-events: none;" 
+             draggable="false"
              onerror="this.style.display='none'"/>
         <span class="history-item-text" style="font-size: 12px;">${escapeHtml(fileName)}</span>
       </div>
@@ -1402,7 +1530,7 @@ function createHistoryItem(word, index) {
   } else if (normalized.type === 'rich') {
     const firstImg = /<img[^>]+src=["']([^"']+)["']/i.exec(normalized.html || '');
     const title = htmlToPlain(normalized.html).slice(0, 20) || '笔记';
-    const thumb = firstImg ? `<img src="${firstImg[1]}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
+    const thumb = firstImg ? `<img src="${firstImg[1]}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0; pointer-events: none;\" draggable=\"false\"/>` : '';
     contentDiv.innerHTML = `
       <div style=\"display: flex; align-items: center; gap: 8px;\">${thumb}
         <span class=\"history-item-text\" style=\"font-size: 12px;\">${escapeHtml(title)}</span>
@@ -1416,7 +1544,8 @@ function createHistoryItem(word, index) {
       contentDiv.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
           <img src="${normalized.content}" 
-               style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" />
+               style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0; pointer-events: none;" 
+               draggable="false" />
           <span class="history-item-text" style="font-size: 12px; color: #666;">内嵌图片</span>
         </div>
       `;
@@ -1454,6 +1583,43 @@ function createHistoryItem(word, index) {
     }
     e.stopPropagation();
     startEditingListItem(item, normalized.content, index);
+  });
+
+  // 拖拽事件：将内容转换为 Markdown 格式
+  item.addEventListener("dragstart", (e) => {
+    // 始终以“文件拖拽”的方式导出为 .md 文件
+    const markdownContent = convertToMarkdown(normalized);
+    const fileName = generateMarkdownFileName(normalized);
+
+    // 阻止默认的文本拖拽，让主进程接管为文件拖拽
+    try { e.preventDefault(); } catch (_) {}
+
+    try {
+      if (window.electronAPI && window.electronAPI.drag && typeof window.electronAPI.drag.startMarkdownDrag === 'function') {
+        window.electronAPI.drag.startMarkdownDrag(markdownContent, fileName);
+      }
+      console.log('[DRAG] 开始文件拖拽(md):', { fileName, preview: markdownContent.substring(0, 50) + '...' });
+    } catch (err) {
+      console.error('[DRAG] 启动文件拖拽失败，回退为文本拖拽:', err);
+      // 回退为文本拖拽，保证最小可用
+      try {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', markdownContent);
+        e.dataTransfer.setData('text/html', markdownContent);
+        e.dataTransfer.setData('Text', markdownContent);
+      } catch (_) {}
+    }
+
+    // 添加拖拽样式
+    item.classList.add('dragging');
+    showStatus('正在拖拽 Markdown 文件...');
+  });
+  
+  // 拖拽结束时移除样式
+  item.addEventListener("dragend", (e) => {
+    item.classList.remove('dragging');
+    console.log('[DRAG] 拖拽结束');
+    showStatus('拖拽完成');
   });
 
   // 键盘导航

@@ -499,6 +499,45 @@ ipcMain.on('show-notification', (event, { title, body }) => {
   showNotification(title, body);
 });
 
+// 开始以 Markdown 文件形式拖拽
+ipcMain.on('start-markdown-drag', (event, payload) => {
+  try {
+    if (!payload || typeof payload.content !== 'string') return;
+    const rawName = (payload.fileName && String(payload.fileName)) || `export_${Date.now()}.md`;
+    const safeName = rawName
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_');
+    const userDataPath = app.getPath('userData');
+    const exportDir = path.join(userDataPath, 'drag-exports');
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+    const filePath = path.join(exportDir, safeName.endsWith('.md') ? safeName : `${safeName}.md`);
+    fs.writeFileSync(filePath, payload.content, 'utf8');
+
+    // 选择一个小图标做为拖拽图标
+    const iconCandidates = [
+      path.join(__dirname, 'icon16.png'),
+      path.join(__dirname, 'RI.png')
+    ];
+    let icon = null;
+    for (const p of iconCandidates) {
+      try {
+        if (fs.existsSync(p)) { icon = nativeImage.createFromPath(p); break; }
+      } catch (_) {}
+    }
+
+    event.sender.startDrag({
+      file: filePath,
+      icon: icon || nativeImage.createEmpty()
+    });
+    console.log('开始文件拖拽:', filePath);
+  } catch (e) {
+    console.error('start-markdown-drag 失败:', e);
+  }
+});
+
 // 获取图片存储目录
 function getImagesDir() {
   const userDataPath = app.getPath('userData');
@@ -811,7 +850,8 @@ ipcMain.on('modes-updated', (event, data) => {
   // 主窗口通知模式列表已更新，转发给笔记窗口
   if (noteWindow && !noteWindow.isDestroyed()) {
     noteWindow.webContents.send('modes-sync', data);
-    console.log('模式列表已同步到笔记窗口');
+    // 开发环境日志过多会拖慢渲染，这里降噪
+    if (process.env.RI_DEBUG === '1') console.log('模式列表已同步到笔记窗口');
   }
 });
 
@@ -820,7 +860,7 @@ ipcMain.on('mode-switched', (event, data) => {
   // 主窗口通知当前模式已切换，转发给笔记窗口
   if (noteWindow && !noteWindow.isDestroyed()) {
     noteWindow.webContents.send('mode-changed', data);
-    console.log(`当前模式已切换到: ${data.mode?.name || '未知'}`);
+    if (process.env.RI_DEBUG === '1') console.log(`当前模式已切换到: ${data.mode?.name || '未知'}`);
   }
 });
 
