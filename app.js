@@ -31,6 +31,11 @@ let editingItemIndex = -1; // 正在编辑的列表项索引
 let originalItemText = ""; // 列表项编辑前的原始文本
 let __dragActive = false; // 当前是否处于拖拽中（调试用）
 
+// 虚拟滚动配置（提升大列表性能）
+const VIRTUAL_ITEM_HEIGHT = 56; // 估算单行高度
+const VIRTUAL_BUFFER = 6;       // 视窗上下缓冲行数
+let __virtualLast = { start: -1, end: -1, total: -1 };
+
 // HTML -> 纯文本（用于搜索、标题、复制）
 function htmlToPlain(html) {
   if (!html) return "";
@@ -482,7 +487,7 @@ function updateModeSidebar() {
 let __dragModeId = null; // 仅旧的 HTML5 DnD 逻辑使用（保留以防回退）
 let __dragGhostEl = null; // 仅旧的 HTML5 DnD 逻辑使用
 let HIDE_NATIVE_DRAG_IMAGE = true; // 运行时调试
-let DEBUG_DND = true; // 运行时调试
+let DEBUG_DND = false; // 运行时调试（默认关闭以提升性能）
 let __mouseDrag = { active: false, modeId: null, ghostEl: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0, _targetId: null, _before: false, justDropped: false };
 
 function dndLog(...args) {
@@ -1188,11 +1193,10 @@ function handleSearchKeyDown(e) {
     e.preventDefault();
     if (filteredWords.length > 0) {
       if (selectedItemIndex === -1) {
-        selectedItemIndex = 0;
+        setActiveItemIndex(0);
       } else if (selectedItemIndex < filteredWords.length - 1) {
-        selectedItemIndex++;
+        setActiveItemIndex(selectedItemIndex + 1);
       }
-      updateHistoryList();
       updatePreview();
       scrollToSelectedItem();
     }
@@ -1200,11 +1204,10 @@ function handleSearchKeyDown(e) {
     e.preventDefault();
     if (filteredWords.length > 0) {
       if (selectedItemIndex === -1) {
-        selectedItemIndex = filteredWords.length - 1;
+        setActiveItemIndex(filteredWords.length - 1);
       } else if (selectedItemIndex > 0) {
-        selectedItemIndex--;
+        setActiveItemIndex(selectedItemIndex - 1);
       }
-      updateHistoryList();
       updatePreview();
       scrollToSelectedItem();
     }
@@ -1232,15 +1235,23 @@ function handleSearchKeyDown(e) {
 // 滚动到选中的项目
 function scrollToSelectedItem() {
   if (selectedItemIndex === -1) return;
-  
-  const selectedItem = document.querySelector(`.history-item[data-index="${selectedItemIndex}"]`);
-  if (selectedItem) {
-    selectedItem.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'nearest',
-      inline: 'nearest'
-    });
-  }
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+  const targetTop = selectedItemIndex * VIRTUAL_ITEM_HEIGHT;
+  const desired = Math.max(0, targetTop - (historyList.clientHeight / 2));
+  historyList.scrollTop = desired;
+  renderVirtualHistoryList();
+}
+
+// 仅更新选中项的样式，不重建整个列表（提升点击/键盘导航性能）
+function setActiveItemIndex(newIndex) {
+  const list = document.getElementById('history-list');
+  if (!list) { selectedItemIndex = newIndex; return; }
+  const prevEl = list.querySelector(`.history-item[data-index="${selectedItemIndex}"]`);
+  if (prevEl) prevEl.classList.remove('active');
+  selectedItemIndex = newIndex;
+  const nextEl = list.querySelector(`.history-item[data-index="${selectedItemIndex}"]`);
+  if (nextEl) nextEl.classList.add('active');
 }
 
 function clearSearch() {
@@ -1343,11 +1354,52 @@ async function updateHistoryList() {
     emptyState.style.display = "none";
   }
 
-  historyList.innerHTML = "";
-  filteredWords.forEach((word, index) => {
-    const item = createHistoryItem(word, index);
-    historyList.appendChild(item);
-  });
+  // 首次绑定滚动监听（虚拟渲染）
+  if (!historyList.__virtualBound) {
+    historyList.addEventListener('scroll', () => {
+      // 使用 rAF 合批，避免滚动抖动
+      if (historyList.__vrAF) cancelAnimationFrame(historyList.__vrAF);
+      historyList.__vrAF = requestAnimationFrame(renderVirtualHistoryList);
+    });
+    historyList.__virtualBound = true;
+  }
+  renderVirtualHistoryList();
+}
+
+// 虚拟渲染历史记录（仅渲染可视区域）
+function renderVirtualHistoryList() {
+  const historyList = document.getElementById('history-list');
+  if (!historyList) return;
+  const total = filteredWords.length;
+  const viewportH = historyList.clientHeight || 400;
+  const scrollTop = historyList.scrollTop || 0;
+  const start = Math.max(0, Math.floor(scrollTop / VIRTUAL_ITEM_HEIGHT) - VIRTUAL_BUFFER);
+  const visible = Math.ceil(viewportH / VIRTUAL_ITEM_HEIGHT) + VIRTUAL_BUFFER * 2;
+  const end = Math.min(total, start + visible);
+
+  // 若范围未变化则跳过
+  if (__virtualLast.start === start && __virtualLast.end === end && __virtualLast.total === total) return;
+  __virtualLast = { start, end, total };
+
+  const topPad = start * VIRTUAL_ITEM_HEIGHT;
+  const bottomPad = (total - end) * VIRTUAL_ITEM_HEIGHT;
+
+  // 构建切片 DOM
+  const frag = document.createDocumentFragment();
+  const topSpacer = document.createElement('div');
+  topSpacer.style.height = topPad + 'px';
+  frag.appendChild(topSpacer);
+
+  for (let i = start; i < end; i++) {
+    frag.appendChild(createHistoryItem(filteredWords[i], i));
+  }
+
+  const bottomSpacer = document.createElement('div');
+  bottomSpacer.style.height = bottomPad + 'px';
+  frag.appendChild(bottomSpacer);
+
+  historyList.innerHTML = '';
+  historyList.appendChild(frag);
 }
 
 function createHistoryItem(word, index) {
@@ -1376,7 +1428,7 @@ function createHistoryItem(word, index) {
   } else if (normalized.type === 'rich') {
     const firstImg = /<img[^>]+src=["']([^"']+)["']/i.exec(normalized.html || '');
     const title = htmlToPlain(normalized.html).slice(0, 20) || '笔记';
-    const thumb = firstImg ? `<img src="${firstImg[1]}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
+    const thumb = firstImg ? `<img src="${firstImg[1]}" loading="lazy" decoding="async" referrerpolicy="no-referrer" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
     contentDiv.innerHTML = `
       <div style=\"display: flex; align-items: center; gap: 8px;\">${thumb}
         <span class=\"history-item-text\" style=\"font-size: 12px;\">${escapeHtml(title)}</span>
@@ -1389,7 +1441,7 @@ function createHistoryItem(word, index) {
     if (isDataUrlImg) {
       contentDiv.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="${normalized.content}" 
+          <img src="${normalized.content}" loading="lazy" decoding="async" 
                style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" />
           <span class="history-item-text" style="font-size: 12px; color: #666;">内嵌图片</span>
         </div>
@@ -1405,10 +1457,9 @@ function createHistoryItem(word, index) {
 
   item.appendChild(contentDiv);
 
-  // 点击选中
+  // 点击选中（仅更新样式+预览，避免重建列表造成卡顿）
   item.addEventListener("click", () => {
-    selectedItemIndex = index;
-    updateHistoryList();
+    setActiveItemIndex(index);
     updatePreview();
     // 将焦点设置到新创建的对应项目上，这样方向键可以继续工作
     setTimeout(() => {
@@ -1448,23 +1499,20 @@ function createHistoryItem(word, index) {
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (index < filteredWords.length - 1) {
-        selectedItemIndex = index + 1;
-        updateHistoryList();
+        setActiveItemIndex(index + 1);
         updatePreview();
         scrollToSelectedItem();
       }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (index > 0) {
-        selectedItemIndex = index - 1;
-        updateHistoryList();
+        setActiveItemIndex(index - 1);
         updatePreview();
         scrollToSelectedItem();
       } else {
         // 回到搜索框
         document.getElementById("search-input")?.focus();
-        selectedItemIndex = -1;
-        updateHistoryList();
+        setActiveItemIndex(-1);
         updatePreview();
       }
     } else if (e.key === "Delete" || e.key === "Backspace") {
@@ -1512,6 +1560,7 @@ function updatePreview() {
         <img src="file://${normalized.path}" 
              class="preview-image" 
              alt="图片预览"
+             loading="lazy" decoding="async"
              style="cursor: default;"
              onerror="this.alt='图片加载失败'"/>
       </div>
@@ -1615,7 +1664,7 @@ function updatePreview() {
       // 显示 dataURL 图片
       previewContent.innerHTML = `
         <div class="preview-image-container">
-          <img src="${normalized.content}" 
+          <img src="${normalized.content}" loading="lazy" decoding="async"
                class="preview-image" 
                alt="图片预览"
                style="cursor: default;"/>
@@ -2405,19 +2454,18 @@ function handleKeyboardNavigation(e) {
 
     if (e.key === 'ArrowDown') {
       if (selectedItemIndex === -1) {
-        selectedItemIndex = 0;
+        setActiveItemIndex(0);
       } else if (selectedItemIndex < filteredWords.length - 1) {
-        selectedItemIndex++;
+        setActiveItemIndex(selectedItemIndex + 1);
       }
     } else if (e.key === 'ArrowUp') {
       if (selectedItemIndex === -1) {
-        selectedItemIndex = filteredWords.length - 1;
+        setActiveItemIndex(filteredWords.length - 1);
       } else if (selectedItemIndex > 0) {
-        selectedItemIndex--;
+        setActiveItemIndex(selectedItemIndex - 1);
       }
     }
 
-    updateHistoryList();
     updatePreview();
     scrollToSelectedItem();
     return;
