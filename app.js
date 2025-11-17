@@ -1320,7 +1320,7 @@ function handleSearch(e) {
   } else {
     selectedItemIndex = -1;
   }
-  
+  updateSelectedItemHighlight();
   updatePreview();
 }
 
@@ -1342,7 +1342,7 @@ function handleSearchKeyDown(e) {
       } else if (selectedItemIndex < filteredWords.length - 1) {
         selectedItemIndex++;
       }
-      updateHistoryList();
+      updateSelectedItemHighlight();
       updatePreview();
       scrollToSelectedItem();
     }
@@ -1354,7 +1354,7 @@ function handleSearchKeyDown(e) {
       } else if (selectedItemIndex > 0) {
         selectedItemIndex--;
       }
-      updateHistoryList();
+      updateSelectedItemHighlight();
       updatePreview();
       scrollToSelectedItem();
     }
@@ -1415,27 +1415,19 @@ function updateSearchUI() {
 
 async function updateHistoryList() {
   let words = [];
-  
+
   if (isAllHistoryMode) {
-    // 全局历史记录：合并所有模式的单词
-    const allWords = [];
-    for (const mode of modes) {
-      const modeWords = await getWordsByMode(mode.id);
-      if (modeWords && modeWords.length > 0) {
-        modeWords.forEach(word => {
-          if (!allWords.find(w => JSON.stringify(w) === JSON.stringify(word))) {
-            allWords.push(word);
-          }
-        });
-      }
-    }
-    words = allWords;
+    // 全局历史记录：并行加载所有模式的单词并合并
+    const modeWordsList = await Promise.all(
+      modes.map((mode) => getWordsByMode(mode.id))
+    );
+    words = modeWordsList.flat();
   } else {
-  if (!currentMode) return;
+    if (!currentMode) return;
     // 从 IndexedDB 加载当前模式的 words
-    words = await getWordsByMode(currentMode.id) || [];
+    words = (await getWordsByMode(currentMode.id)) || [];
   }
-  
+
   // 按创建时间降序排序（最新的在上面）
   words.sort((a, b) => {
     const timeA = a.createdAt || 0;
@@ -1498,6 +1490,27 @@ async function updateHistoryList() {
     const item = createHistoryItem(word, index);
     historyList.appendChild(item);
   });
+}
+
+// 仅更新历史列表中选中项的高亮状态，而不重新渲染整个列表
+function updateSelectedItemHighlight() {
+  const historyList = document.getElementById("history-list");
+  if (!historyList) return;
+
+  // 移除现有高亮
+  const activeItems = historyList.querySelectorAll(".history-item.active");
+  activeItems.forEach((el) => el.classList.remove("active"));
+
+  // 为当前选中项添加高亮
+  if (selectedItemIndex === -1 || selectedItemIndex >= filteredWords.length) {
+    return;
+  }
+  const newItem = historyList.querySelector(
+    `.history-item[data-index="${selectedItemIndex}"]`
+  );
+  if (newItem) {
+    newItem.classList.add("active");
+  }
 }
 
 function createHistoryItem(word, index) {
@@ -1563,7 +1576,7 @@ function createHistoryItem(word, index) {
   // 点击选中
   item.addEventListener("click", () => {
     selectedItemIndex = index;
-    updateHistoryList();
+    updateSelectedItemHighlight();
     updatePreview();
     // 将焦点设置到新创建的对应项目上，这样方向键可以继续工作
     setTimeout(() => {
@@ -1641,7 +1654,7 @@ function createHistoryItem(word, index) {
       e.preventDefault();
       if (index < filteredWords.length - 1) {
         selectedItemIndex = index + 1;
-        updateHistoryList();
+        updateSelectedItemHighlight();
         updatePreview();
         scrollToSelectedItem();
       }
@@ -1649,14 +1662,14 @@ function createHistoryItem(word, index) {
       e.preventDefault();
       if (index > 0) {
         selectedItemIndex = index - 1;
-        updateHistoryList();
+        updateSelectedItemHighlight();
         updatePreview();
         scrollToSelectedItem();
       } else {
         // 回到搜索框
         document.getElementById("search-input")?.focus();
         selectedItemIndex = -1;
-        updateHistoryList();
+        updateSelectedItemHighlight();
         updatePreview();
       }
     } else if (e.key === "Delete" || e.key === "Backspace") {
@@ -2609,7 +2622,7 @@ function handleKeyboardNavigation(e) {
       }
     }
 
-    updateHistoryList();
+    updateSelectedItemHighlight();
     updatePreview();
     scrollToSelectedItem();
     return;
