@@ -151,9 +151,15 @@ function loadNoteContent() {
 function updateTitle() {
   const titleEl = document.getElementById('md-title');
   if (currentMode) {
-    // 获取笔记的第一行作为标题
+    // 获取笔记的第一行作为标题（不截断，让 CSS 处理截断）
     const firstLine = getFirstLineText(editorContent);
-    titleEl.textContent = firstLine || `${currentMode.name}`;
+    if (firstLine) {
+      titleEl.textContent = firstLine;
+      titleEl.title = firstLine; // 完整内容作为 tooltip
+    } else {
+      titleEl.textContent = currentMode.name;
+      titleEl.title = currentMode.name;
+    }
   }
 }
 
@@ -1095,10 +1101,11 @@ function getFirstLineText(html) {
   const text = div.textContent || div.innerText || '';
   const lines = text.split('\n');
   
+  // 只返回第一行，不截断（让 CSS 处理截断和省略号）
   for (let line of lines) {
     const trimmed = line.trim();
     if (trimmed) {
-      return trimmed.length > 20 ? trimmed.substring(0, 20) + '...' : trimmed;
+      return trimmed; // 返回完整的第一行，不在这里截断
     }
   }
   

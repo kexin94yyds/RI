@@ -137,6 +137,10 @@
       font-weight: 500;
       color: #333;
       pointer-events: none;
+      white-space: nowrap; /* 不换行 */
+      overflow: hidden; /* 超出隐藏 */
+      text-overflow: ellipsis; /* 显示省略号 */
+      max-width: calc(100% - 300px); /* 确保不超出按钮区域，留出左右按钮空间 */
     }
 
     /* 模式切换器 */
