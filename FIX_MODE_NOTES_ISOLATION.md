@@ -170,3 +170,11 @@ async function switchToMode(mode) {
 
 用户现在可以放心地在不同模式之间切换，每个模式的笔记内容都会正确保存和加载。
 
+
+
+
+
+
+
+
+

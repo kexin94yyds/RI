@@ -1,5 +1,4 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, nativeImage, shell, dialog } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
 const fs = require('fs');
@@ -29,6 +28,8 @@ let mainWindow = null;
 let noteWindow = null; // 笔记窗口
 let lastShowAt = 0; // 记录最近一次显示时间，用于忽略刚显示时的 blur
 let lastNoteShowAt = 0; // 笔记窗口显示时间
+let autoUpdater = null;
+let autoUpdaterInitialized = false;
 
 // 在当前活动 Space/全屏上显示，并跟随鼠标所在显示器
 async function showOnActiveSpace() {
@@ -893,12 +894,86 @@ ipcMain.on('note-saved', (event, data) => {
 
 // ==================== 自动更新功能 ====================
 
-// 配置自动更新
-autoUpdater.autoDownload = false; // 不自动下载，询问用户
-autoUpdater.autoInstallOnAppQuit = true; // 退出时自动安装
+function ensureAutoUpdater() {
+  if (autoUpdaterInitialized && autoUpdater) {
+    return autoUpdater;
+  }
+  try {
+    autoUpdater = require('electron-updater').autoUpdater;
+    configureAutoUpdater(autoUpdater);
+    autoUpdaterInitialized = true;
+    return autoUpdater;
+  } catch (error) {
+    console.error('自动更新初始化失败:', error);
+    autoUpdater = null;
+    autoUpdaterInitialized = false;
+    return null;
+  }
+}
+
+function configureAutoUpdater(updater) {
+  updater.autoDownload = false; // 不自动下载，询问用户
+  updater.autoInstallOnAppQuit = true; // 退出时自动安装
+
+  updater.on('update-available', (info) => {
+    console.log('发现新版本:', info.version);
+    
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '发现新版本',
+      message: `发现新版本 ${info.version}，是否立即下载？`,
+      detail: '下载完成后会提示您安装',
+      buttons: ['立即下载', '稍后提醒'],
+      defaultId: 0,
+      cancelId: 1
+    }).then(result => {
+      if (result.response === 0) {
+        updater.downloadUpdate();
+        showNotification('开始下载', '正在下载新版本...');
+      }
+    });
+  });
+
+  updater.on('update-not-available', () => {
+    console.log('当前已是最新版本');
+  });
+
+  updater.on('download-progress', (progressObj) => {
+    let log = `下载进度: ${Math.round(progressObj.percent)}%`;
+    console.log(log);
+  });
+
+  updater.on('update-downloaded', (info) => {
+    console.log('更新下载完成:', info.version);
+    
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '更新已就绪',
+      message: `新版本 ${info.version} 已下载完成`,
+      detail: '点击"立即重启"以安装更新',
+      buttons: ['立即重启', '稍后安装'],
+      defaultId: 0,
+      cancelId: 1
+    }).then(result => {
+      if (result.response === 0) {
+        updater.quitAndInstall(false, true);
+      }
+    });
+  });
+
+  updater.on('error', (err) => {
+    console.error('自动更新错误:', err);
+  });
+}
 
 // 检查更新
 function checkForUpdates() {
+  const updater = ensureAutoUpdater();
+  if (!updater) {
+    console.log('自动更新不可用，跳过检查');
+    return;
+  }
+
   // 只在打包后的应用中检查更新
   if (!app.isPackaged) {
     console.log('开发模式，跳过更新检查');
@@ -906,62 +981,7 @@ function checkForUpdates() {
   }
   
   console.log('正在检查更新...');
-  autoUpdater.checkForUpdates().catch(err => {
+  updater.checkForUpdates().catch(err => {
     console.error('检查更新失败:', err);
   });
 }
-
-// 发现新版本
-autoUpdater.on('update-available', (info) => {
-  console.log('发现新版本:', info.version);
-  
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: '发现新版本',
-    message: `发现新版本 ${info.version}，是否立即下载？`,
-    detail: '下载完成后会提示您安装',
-    buttons: ['立即下载', '稍后提醒'],
-    defaultId: 0,
-    cancelId: 1
-  }).then(result => {
-    if (result.response === 0) {
-      autoUpdater.downloadUpdate();
-      showNotification('开始下载', '正在下载新版本...');
-    }
-  });
-});
-
-// 没有新版本
-autoUpdater.on('update-not-available', () => {
-  console.log('当前已是最新版本');
-});
-
-// 下载进度
-autoUpdater.on('download-progress', (progressObj) => {
-  let log = `下载进度: ${Math.round(progressObj.percent)}%`;
-  console.log(log);
-});
-
-// 下载完成
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('更新下载完成:', info.version);
-  
-  dialog.showMessageBox(mainWindow, {
-    type: 'info',
-    title: '更新已就绪',
-    message: `新版本 ${info.version} 已下载完成`,
-    detail: '点击"立即重启"以安装更新',
-    buttons: ['立即重启', '稍后安装'],
-    defaultId: 0,
-    cancelId: 1
-  }).then(result => {
-    if (result.response === 0) {
-      autoUpdater.quitAndInstall(false, true);
-    }
-  });
-});
-
-// 更新错误
-autoUpdater.on('error', (err) => {
-  console.error('自动更新错误:', err);
-});

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拖拽测试页面</title>
+  <style>
+    body {
+      font-family: 'PingFang SC', sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .drop-zone {
+      border: 3px dashed #ccc;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      min-height: 200px;
+      background: #fafafa;
+      transition: all 0.3s;
+      margin: 20px 0;
+    }
+    
+    .drop-zone.active {
+      border-color: #4a90e2;
+      background: #e3f2fd;
+    }
+    
+    .drop-zone p {
+      color: #666;
+      font-size: 18px;
+      margin: 10px 0;
+    }
+    
+    .result {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #dee2e6;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .info {
+      background: #e7f3ff;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #2196F3;
+      margin: 20px 0;
+    }
+    
+    .info h3 {
+      margin: 0 0 10px 0;
+      color: #1976D2;
+    }
+    
+    .info ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    
+    .info li {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 拖拽功能测试页面</h1>
+    
+    <div class="info">
+      <h3>使用说明：</h3>
+      <ul>
+        <li>从 Replace-Information 应用的历史记录列表中</li>
+        <li>拖拽任意列表项到下方的蓝色区域</li>
+        <li>松开鼠标查看接收到的内容</li>
+      </ul>
+    </div>
+    
+    <div class="drop-zone" id="dropZone">
+      <p>📦 拖拽区域</p>
+      <p style="font-size: 14px; color: #999;">将列表项拖到这里</p>
+    </div>
+    
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const result = document.getElementById('result');
+    
+    // 阻止默认拖拽行为
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+    });
+    
+    // 拖拽进入
+    dropZone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('active');
+      console.log('[TEST] dragenter');
+    });
+    
+    // 拖拽悬停
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    
+    // 拖拽离开
+    dropZone.addEventListener('dragleave', (e) => {
+      if (e.target === dropZone) {
+        dropZone.classList.remove('active');
+        console.log('[TEST] dragleave');
+      }
+    });
+    
+    // 放下
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('active');
+      
+      console.log('[TEST] drop event:', e);
+      console.log('[TEST] dataTransfer types:', e.dataTransfer.types);
+      
+      // 获取所有可能的数据类型
+      const types = e.dataTransfer.types;
+      let output = '<div class="result">';
+      output += '<strong>✅ 接收到拖拽数据！</strong><br><br>';
+      output += '<strong>可用的数据类型：</strong><br>';
+      output += types.join(', ') + '<br><br>';
+      
+      // 尝试读取各种格式的数据
+      types.forEach(type => {
+        try {
+          const data = e.dataTransfer.getData(type);
+          if (data) {
+            output += `<strong>${type}:</strong><br>`;
+            output += '<pre style="background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd; margin: 10px 0;">';
+            output += escapeHtml(data);
+            output += '</pre>';
+          }
+        } catch (err) {
+          console.error(`无法读取 ${type}:`, err);
+        }
+      });
+      
+      output += '</div>';
+      result.innerHTML = output;
+    });
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // 全局拖拽监听（调试用）
+    document.addEventListener('dragstart', (e) => {
+      console.log('[TEST] document dragstart:', e.target);
+    });
+    
+    document.addEventListener('dragend', (e) => {
+      console.log('[TEST] document dragend');
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
