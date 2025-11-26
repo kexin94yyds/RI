@@ -1,6 +1,6 @@
 {
   "name": "replace-information",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Replace-Information - 信息置换工具",
   "main": "electron-main.js",
   "scripts": {
