@@ -67,11 +67,13 @@ async function showOnActiveSpace() {
   // 因为这会让窗口回到原来的 Space，而不是停留在当前全屏应用的 Space
   // 保持 setVisibleOnAllWorkspaces(true) 可以让窗口始终覆盖在当前 Space（包括全屏应用）
   
-  // 200ms后恢复用户置顶偏好（但不还原工作区可见性）
+  // 200ms后恢复用户置顶偏好，并适度恢复工作区可见性
   setTimeout(() => {
     try {
       const pinned = !!store.get('mainPinned');
       mainWindow.setAlwaysOnTop(pinned, pinned ? 'floating' : undefined);
+      // 适度恢复工作区可见性，避免后续桌面切换时被系统强制带回旧 Space
+      mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
     } catch (_) {}
   }, 200);
 }
@@ -259,6 +261,15 @@ async function showNoteWindow() {
   // 🔑 关键修复：不再还原工作区可见性
   // 之前 200ms 后调用 setVisibleOnAllWorkspaces(false) 会导致窗口在全屏应用前面来回跳动
   // 保持 setVisibleOnAllWorkspaces(true) 可以让窗口始终覆盖在当前 Space（包括全屏应用）
+
+  // 在短暂延时后恢复工作区可见性设置，避免后续桌面切换时被系统强制带回旧 Space
+  setTimeout(() => {
+    try {
+      if (noteWindow && !noteWindow.isDestroyed()) {
+        noteWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
+      }
+    } catch (_) {}
+  }, 300);
 }
 
 // 快速保存（不显示窗口，只显示通知）
