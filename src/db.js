@@ -10,7 +10,7 @@ const SETTINGS_STORE = 'settings';
 
 // 验证常量
 const MAX_NAME_LENGTH = 100;
-const MAX_NOTES_LENGTH = 500000;  // 笔记内容可以很长
+const MAX_NOTES_LENGTH = 15000000;  // 提升上限以容纳高清 dataURL
 const MAX_WORD_LENGTH = 10000;
 
 let db = null;

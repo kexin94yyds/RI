@@ -17,6 +17,7 @@ let editorContent = '';
 let currentMode = null;
 let currentModeId = null;
 let saveTimeout = null;
+let isSavingBeforeHide = false;
 let modes = [];
 
 // 自动历史记录保存
@@ -347,29 +348,20 @@ function setupEventListeners() {
   
   // 搜索相关事件
   setupSearchListeners();
+
+  // 页面隐藏时兜底保存
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      performSaveBeforeHide('visibilitychange');
+    }
+  });
   
   // 监听主窗口的模式更新事件（IPC）
   if (window.electron && window.electron.ipcRenderer) {
     // 监听窗口隐藏事件（在隐藏前保存）
     window.electron.ipcRenderer.on('window-hiding', async () => {
       console.log('📝 窗口即将隐藏，保存内容...');
-      try {
-        // 取消待处理的保存
-        if (saveTimeout) {
-          clearTimeout(saveTimeout);
-          saveTimeout = null;
-        }
-        
-        // 立即保存当前内容到模式
-        await saveNoteContent();
-        
-        // 仅当文本有差异时才保存到历史记录（避免重复）
-        await saveToHistory();
-        
-        console.log('✅ 窗口隐藏前保存完成');
-      } catch (error) {
-        console.error('窗口隐藏前保存失败:', error);
-      }
+      await performSaveBeforeHide('window-hiding');
     });
     
     // 监听模式列表更新
@@ -629,6 +621,26 @@ function htmlToPlainTextForNote(html) {
   return (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
 }
 
+// 检查内容是否相比上次历史有变化（包含纯文本和图片等富文本差异）
+function hasContentChanged(content) {
+  const plainText = htmlToPlainTextForNote(content).trim();
+  const lastPlain = htmlToPlainTextForNote(lastHistorySavedContent || '').trim();
+
+  if (plainText !== lastPlain) return true;
+
+  // 若纯文本相同，但富文本（如图片、格式）有差异，也视为变化
+  const normalized = (content || '').replace(/\s+/g, ' ').trim();
+  const normalizedLast = (lastHistorySavedContent || '').replace(/\s+/g, ' ').trim();
+
+  if (normalized !== normalizedLast) {
+    // 优先关注包含图片等富文本的改动
+    const hasImg = /<img[^>]*src=/i.test(normalized) || /<img[^>]*>/i.test(normalized);
+    if (hasImg) return true;
+  }
+
+  return false;
+}
+
 // 显示存储状态
 async function showStorageStatus() {
   const modal = document.createElement('div');
@@ -840,38 +852,47 @@ async function handleImageFile(file) {
   }
 }
 
-function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.8) {
+function compressImage(file, maxWidth = 4096, maxHeight = 4096, quality = 0.98) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
+      const originalDataUrl = e.target.result;
       const img = new Image();
-      
+
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width = Math.floor(width * ratio);
-          height = Math.floor(height * ratio);
+        // 如果图片尺寸已经在可接受范围内，直接返回原始数据，避免重复压缩导致画质损失
+        const needsResize = img.width > maxWidth || img.height > maxHeight;
+        if (!needsResize) {
+          resolve(originalDataUrl);
+          return;
         }
-        
+
+        const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+        const width = Math.round(img.width * ratio);
+        const height = Math.round(img.height * ratio);
+
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        
+
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        // 保持原始 MIME 类型；仅在 JPEG 时使用质量参数，其余使用无损导出
+        const mime = (file.type && file.type.startsWith('image/')) ? file.type : 'image/png';
+        const exportQuality = mime === 'image/jpeg' ? quality : 1.0;
+
+        const dataUrl = canvas.toDataURL(mime, exportQuality);
         resolve(dataUrl);
       };
-      
+
       img.onerror = () => reject(new Error('图片加载失败'));
-      img.src = e.target.result;
+      img.src = originalDataUrl;
     };
-    
+
     reader.onerror = () => reject(new Error('文件读取失败'));
     reader.readAsDataURL(file);
   });
@@ -905,6 +926,49 @@ function insertElementAtCursor(element) {
 }
 
 // ==================== 保存功能 ====================
+
+function sendNoteHideAck(reason = 'window-hiding', skipped = false) {
+  try {
+    if (window.electron && window.electron.ipcRenderer) {
+      window.electron.ipcRenderer.send('note-hide-ack', {
+        reason,
+        skipped,
+        ts: Date.now()
+      });
+    }
+  } catch (error) {
+    console.error('发送隐藏确认失败:', error);
+  }
+}
+
+async function performSaveBeforeHide(reason = 'window-hiding') {
+  if (isSavingBeforeHide) {
+    sendNoteHideAck(reason, true);
+    return;
+  }
+
+  isSavingBeforeHide = true;
+
+  try {
+    // 清理待执行的自动保存/历史定时器
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    if (autoHistoryTimeout) {
+      clearTimeout(autoHistoryTimeout);
+      autoHistoryTimeout = null;
+    }
+
+    await saveNoteContent();
+    await saveToHistory();
+  } catch (error) {
+    console.error('隐藏前保存失败:', error);
+  } finally {
+    sendNoteHideAck(reason, false);
+    isSavingBeforeHide = false;
+  }
+}
 
 async function saveNoteContent() {
   try {
@@ -948,15 +1012,15 @@ async function saveToHistory() {
     const content = editorContent || '';
     const plainText = htmlToPlainTextForNote(content).trim();
     
-    // 检查是否有内容
-    if (!content || plainText.length === 0) {
+    // 检查是否有内容（纯文本或图片都算有内容）
+    const hasImage = content.includes('<img');
+    if (!content || (plainText.length === 0 && !hasImage)) {
       console.log('⏭️ 跳过保存：内容为空');
       return;
     }
     
-  // 检查文本是否有变化（避免重复保存相同内容）
-  const lastPlain = htmlToPlainTextForNote(lastHistorySavedContent || '').trim();
-  if (lastPlain === plainText) {
+    // 检查文本或富文本是否有变化（包含图片变动）
+    if (!hasContentChanged(content)) {
       console.log('⏭️ 跳过保存：内容无变化');
       // 继续下一次定时
       startAutoHistorySave();
@@ -972,7 +1036,7 @@ async function saveToHistory() {
     const entry = {
       type: 'rich',
       html: content,
-      content: plainText,
+      content: plainText || '[图片]',
       createdAt: Date.now()
     };
     
@@ -1010,8 +1074,9 @@ async function saveToHistoryForce() {
     const content = editorContent || '';
     const plainText = htmlToPlainTextForNote(content).trim();
     
-    // 检查是否有内容
-    if (!content || plainText.length === 0) {
+    // 检查是否有内容（纯文本或图片都算有内容）
+    const hasImage = content.includes('<img');
+    if (!content || (plainText.length === 0 && !hasImage)) {
       console.log('⏭️ 跳过保存：内容为空');
       return;
     }

@@ -1587,15 +1587,15 @@ function createHistoryItem(word, index) {
     }, 0);
   });
 
-  // 双击进入编辑模式（仅文本）
+  // 双击复制到剪切板
   item.addEventListener("dblclick", (e) => {
-    if (normalized.type !== 'text') return; // 仅文本支持编辑
-    if (isAllHistoryMode) {
-      alert("在全局历史记录模式下无法编辑，请切换到具体模式");
-      return;
-    }
     e.stopPropagation();
-    startEditingListItem(item, normalized.content, index);
+    // 先选中当前项
+    selectedItemIndex = index;
+    updateSelectedItemHighlight();
+    updatePreview();
+    // 然后复制到剪切板
+    copyToClipboardFromPreview();
   });
 
   // 拖拽事件：将内容转换为 Markdown 格式

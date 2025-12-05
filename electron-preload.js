@@ -71,7 +71,7 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => {
       // 白名单允许的频道
-      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched', 'note-saved', 'start-markdown-drag'];
+      const validChannels = ['toggle-note-pin', 'modes-updated', 'mode-switched', 'note-saved', 'start-markdown-drag', 'note-hide-ack'];
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }

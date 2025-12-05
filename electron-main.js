@@ -1,25 +1,8 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, clipboard, screen, nativeImage, shell, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const Store = require('electron-store');
 const path = require('path');
 const fs = require('fs');
-
-// 使用默认数据目录，确保开发版本也能访问原有数据
-// 数据存储在: ~/Library/Application Support/replace-information
-// 如果需要使用独立开发数据目录，可以设置环境变量: USE_DEV_DATA_DIR=1
-try {
-  if (app && typeof app.isPackaged === 'boolean' && !app.isPackaged && process.env.USE_DEV_DATA_DIR === '1') {
-    const devUserData = path.join(__dirname, '.dev-user-data');
-    if (!fs.existsSync(devUserData)) {
-      fs.mkdirSync(devUserData, { recursive: true });
-    }
-    app.setPath('userData', devUserData);
-    console.log('使用开发数据目录:', devUserData);
-  } else {
-    console.log('使用默认数据目录:', app.getPath('userData'));
-  }
-} catch (error) {
-  console.warn('数据目录设置失败:', error);
-}
 
 // 初始化存储
 const store = new Store();
@@ -28,8 +11,7 @@ let mainWindow = null;
 let noteWindow = null; // 笔记窗口
 let lastShowAt = 0; // 记录最近一次显示时间，用于忽略刚显示时的 blur
 let lastNoteShowAt = 0; // 笔记窗口显示时间
-let autoUpdater = null;
-let autoUpdaterInitialized = false;
+const NOTE_HIDE_ACK_TIMEOUT = 700; // 隐藏前等待渲染进程保存的超时时间(ms)
 
 // 在当前活动 Space/全屏上显示，并跟随鼠标所在显示器
 async function showOnActiveSpace() {
@@ -62,18 +44,14 @@ async function showOnActiveSpace() {
   mainWindow.focus();
   lastShowAt = Date.now(); // 记录显示时间
   
-  // 🔑 关键修复：不再还原工作区可见性
-  // 之前 200ms 后调用 setVisibleOnAllWorkspaces(false) 会导致窗口在全屏应用前面来回跳动
-  // 因为这会让窗口回到原来的 Space，而不是停留在当前全屏应用的 Space
-  // 保持 setVisibleOnAllWorkspaces(true) 可以让窗口始终覆盖在当前 Space（包括全屏应用）
-  
-  // 200ms后恢复用户置顶偏好，并适度恢复工作区可见性
+  // 200ms后还原，仅在当前 Space 可见，并恢复用户置顶偏好
   setTimeout(() => {
+    try { 
+      mainWindow.setVisibleOnAllWorkspaces(false); 
+    } catch (_) {}
     try {
       const pinned = !!store.get('mainPinned');
       mainWindow.setAlwaysOnTop(pinned, pinned ? 'floating' : undefined);
-      // 适度恢复工作区可见性，避免后续桌面切换时被系统强制带回旧 Space
-      mainWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
     } catch (_) {}
   }, 200);
 }
@@ -181,21 +159,7 @@ function createNoteWindow() {
   noteWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
-      
-      // 通知渲染进程窗口即将隐藏，让它保存内容
-      if (noteWindow && !noteWindow.isDestroyed()) {
-        noteWindow.webContents.send('window-hiding');
-      }
-      
-      // 稍微延迟一下再隐藏，确保保存完成
-      setTimeout(() => {
-        if (noteWindow && !noteWindow.isDestroyed()) {
-          // 保存窗口位置
-          const bounds = noteWindow.getBounds();
-          store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
-          noteWindow.hide();
-        }
-      }, 100);
+      requestNoteHideWithSave();
     }
   });
 
@@ -258,18 +222,59 @@ async function showNoteWindow() {
   noteWindow.focus();
   lastNoteShowAt = Date.now();
 
-  // 🔑 关键修复：不再还原工作区可见性
-  // 之前 200ms 后调用 setVisibleOnAllWorkspaces(false) 会导致窗口在全屏应用前面来回跳动
-  // 保持 setVisibleOnAllWorkspaces(true) 可以让窗口始终覆盖在当前 Space（包括全屏应用）
-
-  // 在短暂延时后恢复工作区可见性设置，避免后续桌面切换时被系统强制带回旧 Space
+  // 200ms后还原工作区可见性
   setTimeout(() => {
     try {
-      if (noteWindow && !noteWindow.isDestroyed()) {
-        noteWindow.setVisibleOnAllWorkspaces(false, { visibleOnFullScreen: true });
-      }
+      noteWindow.setVisibleOnAllWorkspaces(false);
     } catch (_) {}
-  }, 300);
+  }, 200);
+}
+
+// 等待渲染进程确认已在隐藏前完成保存
+function waitForNoteHideAck() {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => cleanup('timeout'), NOTE_HIDE_ACK_TIMEOUT);
+
+    const handler = () => cleanup('ack');
+
+    const cleanup = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      ipcMain.removeListener('note-hide-ack', handler);
+      resolve(result);
+    };
+
+    ipcMain.on('note-hide-ack', handler);
+  });
+}
+
+// 请求渲染进程保存后再隐藏笔记窗口
+async function requestNoteHideWithSave() {
+  if (!noteWindow || noteWindow.isDestroyed()) return;
+
+  try {
+    noteWindow.webContents.send('window-hiding');
+  } catch (e) {
+    console.error('发送 window-hiding 失败:', e);
+  }
+
+  try {
+    await waitForNoteHideAck();
+  } catch (e) {
+    console.error('等待隐藏确认失败:', e);
+  }
+
+  try {
+    if (noteWindow && !noteWindow.isDestroyed()) {
+      const bounds = noteWindow.getBounds();
+      store.set('noteWindowPosition', { x: bounds.x, y: bounds.y });
+      noteWindow.hide();
+    }
+  } catch (e) {
+    console.error('隐藏笔记窗口失败:', e);
+  }
 }
 
 // 快速保存（不显示窗口，只显示通知）
@@ -447,14 +452,7 @@ app.whenReady().then(() => {
     try {
       if (noteWindow && !noteWindow.isDestroyed() && noteWindow.isVisible()) {
         console.log('隐藏笔记窗口');
-        // 通知渲染进程保存
-        noteWindow.webContents.send('window-hiding');
-        // 延迟隐藏，确保保存完成
-        setTimeout(() => {
-          if (noteWindow && !noteWindow.isDestroyed()) {
-            noteWindow.hide();
-          }
-        }, 100);
+        requestNoteHideWithSave();
       } else {
         console.log('显示笔记窗口');
         showNoteWindow();
@@ -904,86 +902,12 @@ ipcMain.on('note-saved', (event, data) => {
 
 // ==================== 自动更新功能 ====================
 
-function ensureAutoUpdater() {
-  if (autoUpdaterInitialized && autoUpdater) {
-    return autoUpdater;
-  }
-  try {
-    autoUpdater = require('electron-updater').autoUpdater;
-    configureAutoUpdater(autoUpdater);
-    autoUpdaterInitialized = true;
-    return autoUpdater;
-  } catch (error) {
-    console.error('自动更新初始化失败:', error);
-    autoUpdater = null;
-    autoUpdaterInitialized = false;
-    return null;
-  }
-}
-
-function configureAutoUpdater(updater) {
-  updater.autoDownload = false; // 不自动下载，询问用户
-  updater.autoInstallOnAppQuit = true; // 退出时自动安装
-
-  updater.on('update-available', (info) => {
-    console.log('发现新版本:', info.version);
-    
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 ${info.version}，是否立即下载？`,
-      detail: '下载完成后会提示您安装',
-      buttons: ['立即下载', '稍后提醒'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        updater.downloadUpdate();
-        showNotification('开始下载', '正在下载新版本...');
-      }
-    });
-  });
-
-  updater.on('update-not-available', () => {
-    console.log('当前已是最新版本');
-  });
-
-  updater.on('download-progress', (progressObj) => {
-    let log = `下载进度: ${Math.round(progressObj.percent)}%`;
-    console.log(log);
-  });
-
-  updater.on('update-downloaded', (info) => {
-    console.log('更新下载完成:', info.version);
-    
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '更新已就绪',
-      message: `新版本 ${info.version} 已下载完成`,
-      detail: '点击"立即重启"以安装更新',
-      buttons: ['立即重启', '稍后安装'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        updater.quitAndInstall(false, true);
-      }
-    });
-  });
-
-  updater.on('error', (err) => {
-    console.error('自动更新错误:', err);
-  });
-}
+// 配置自动更新
+autoUpdater.autoDownload = false; // 不自动下载，询问用户
+autoUpdater.autoInstallOnAppQuit = true; // 退出时自动安装
 
 // 检查更新
 function checkForUpdates() {
-  const updater = ensureAutoUpdater();
-  if (!updater) {
-    console.log('自动更新不可用，跳过检查');
-    return;
-  }
-
   // 只在打包后的应用中检查更新
   if (!app.isPackaged) {
     console.log('开发模式，跳过更新检查');
@@ -991,7 +915,62 @@ function checkForUpdates() {
   }
   
   console.log('正在检查更新...');
-  updater.checkForUpdates().catch(err => {
+  autoUpdater.checkForUpdates().catch(err => {
     console.error('检查更新失败:', err);
   });
 }
+
+// 发现新版本
+autoUpdater.on('update-available', (info) => {
+  console.log('发现新版本:', info.version);
+  
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '发现新版本',
+    message: `发现新版本 ${info.version}，是否立即下载？`,
+    detail: '下载完成后会提示您安装',
+    buttons: ['立即下载', '稍后提醒'],
+    defaultId: 0,
+    cancelId: 1
+  }).then(result => {
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate();
+      showNotification('开始下载', '正在下载新版本...');
+    }
+  });
+});
+
+// 没有新版本
+autoUpdater.on('update-not-available', () => {
+  console.log('当前已是最新版本');
+});
+
+// 下载进度
+autoUpdater.on('download-progress', (progressObj) => {
+  let log = `下载进度: ${Math.round(progressObj.percent)}%`;
+  console.log(log);
+});
+
+// 下载完成
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('更新下载完成:', info.version);
+  
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '更新已就绪',
+    message: `新版本 ${info.version} 已下载完成`,
+    detail: '点击"立即重启"以安装更新',
+    buttons: ['立即重启', '稍后安装'],
+    defaultId: 0,
+    cancelId: 1
+  }).then(result => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall(false, true);
+    }
+  });
+});
+
+// 更新错误
+autoUpdater.on('error', (err) => {
+  console.error('自动更新错误:', err);
+});
