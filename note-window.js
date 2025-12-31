@@ -11,6 +11,7 @@ import {
   setSetting
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
+import { sanitizeUrl, sanitizeAttribute, sanitizeHtml } from './src/security.js';
 
 let editor = null;
 let editorContent = '';
@@ -104,10 +105,12 @@ async function loadModesAndContent() {
 // 加载笔记内容
 function loadNoteContent() {
   if (currentMode && currentMode.notes) {
-    editor.innerHTML = currentMode.notes;
-    editorContent = currentMode.notes;
+    // Sanitize HTML content to prevent XSS
+    const sanitizedNotes = sanitizeHtml(currentMode.notes);
+    editor.innerHTML = sanitizedNotes;
+    editorContent = sanitizedNotes;
     editor.removeAttribute('data-placeholder');
-    console.log(`📝 已加载模式 "${currentMode.name}" 的笔记 (ID: ${currentMode.id}, 内容长度: ${currentMode.notes.length})`);
+    console.log(`📝 已加载模式 "${currentMode.name}" 的笔记 (ID: ${currentMode.id}, 内容长度: ${sanitizedNotes.length})`);
   } else {
     editor.innerHTML = '';
     editorContent = '';
