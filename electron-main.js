@@ -723,6 +723,29 @@ ipcMain.handle('open-path', async (event, filePath) => {
 // 打开外部链接（URL）
 ipcMain.handle('shell-open-external', async (event, url) => {
   try {
+    // Validate URL to prevent command injection
+    if (!url || typeof url !== 'string') {
+      console.error('Invalid URL provided to shell.openExternal');
+      return false;
+    }
+    
+    // Remove whitespace and control characters
+    url = url.trim().replace(/[\x00-\x1F\x7F]/g, '');
+    
+    // Only allow safe protocols
+    const allowedProtocols = /^(https?|mailto):/i;
+    
+    if (!allowedProtocols.test(url)) {
+      console.error('Blocked URL with disallowed protocol:', url);
+      return false;
+    }
+    
+    // Block any potential shell command injection attempts
+    if (/[;&|`$(){}[\]<>\\]/.test(url)) {
+      console.error('Blocked URL with shell metacharacters:', url);
+      return false;
+    }
+    
     await shell.openExternal(url);
     console.log('已打开链接:', url);
     return true;

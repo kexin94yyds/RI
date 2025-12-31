@@ -1376,7 +1376,9 @@ function createHistoryItem(word, index) {
   } else if (normalized.type === 'rich') {
     const firstImg = /<img[^>]+src=["']([^"']+)["']/i.exec(normalized.html || '');
     const title = htmlToPlain(normalized.html).slice(0, 20) || '笔记';
-    const thumb = firstImg ? `<img src="${firstImg[1]}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
+    // Sanitize the extracted URL to prevent XSS
+    const sanitizedImgSrc = firstImg ? sanitizeUrl(firstImg[1]) : '';
+    const thumb = sanitizedImgSrc ? `<img src="${sanitizeAttribute(sanitizedImgSrc)}" style=\"width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;\"/>` : '';
     contentDiv.innerHTML = `
       <div style=\"display: flex; align-items: center; gap: 8px;\">${thumb}
         <span class=\"history-item-text\" style=\"font-size: 12px;\">${escapeHtml(title)}</span>
@@ -1387,13 +1389,23 @@ function createHistoryItem(word, index) {
     // 显示文本
     const isDataUrlImg = typeof normalized.content === 'string' && /^data:image\/(png|jpeg|jpg|gif|webp);base64,.+/i.test(normalized.content);
     if (isDataUrlImg) {
-      contentDiv.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="${normalized.content}" 
-               style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" />
-          <span class="history-item-text" style="font-size: 12px; color: #666;">内嵌图片</span>
-        </div>
-      `;
+      // Sanitize data URL to prevent XSS
+      const sanitizedDataUrl = sanitizeUrl(normalized.content);
+      if (sanitizedDataUrl) {
+        contentDiv.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <img src="${sanitizeAttribute(sanitizedDataUrl)}" 
+                 style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px; flex-shrink: 0;" />
+            <span class="history-item-text" style="font-size: 12px; color: #666;">内嵌图片</span>
+          </div>
+        `;
+      } else {
+        // If sanitization fails, show text instead
+        const textDiv = document.createElement("div");
+        textDiv.className = "history-item-text";
+        textDiv.textContent = '无效的图片数据';
+        contentDiv.appendChild(textDiv);
+      }
     } else {
       const textDiv = document.createElement("div");
       textDiv.className = "history-item-text";
@@ -1507,9 +1519,11 @@ function updatePreview() {
   
   if (normalized.type === 'image') {
     // 显示图片预览 - 纯净模式，无按钮
+    // Sanitize the file path to prevent XSS
+    const sanitizedPath = sanitizeAttribute(normalized.path || '');
     previewContent.innerHTML = `
       <div class="preview-image-container">
-        <img src="file://${normalized.path}" 
+        <img src="file://${sanitizedPath}" 
              class="preview-image" 
              alt="图片预览"
              style="cursor: default;"
@@ -1518,12 +1532,14 @@ function updatePreview() {
     `;
   } else if (normalized.type === 'rich') {
     // 显示富文本笔记（与笔记窗口一致）
+    // Sanitize HTML to prevent XSS while preserving formatting
+    const sanitizedHtml = sanitizeHtml(normalized.html || '');
     previewContent.innerHTML = `
       <div class="preview-rich-editor" 
            contenteditable="true" 
            style="padding: 20px; line-height: 1.6; min-height: 100%; outline: none; font-size: 14px; color: #333; overflow-y: auto;"
            data-placeholder="在此编辑笔记内容...">
-        ${normalized.html || ''}
+        ${sanitizedHtml}
       </div>
     `;
     
@@ -1668,6 +1684,106 @@ function updatePreview() {
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
+  return div.innerHTML;
+}
+
+// Sanitize URL to prevent XSS and command injection
+function sanitizeUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  
+  // Remove any whitespace and control characters
+  url = url.trim().replace(/[\x00-\x1F\x7F]/g, '');
+  
+  // Only allow http, https, data (for images), file, and mailto protocols
+  const allowedProtocols = /^(https?|data|file|mailto):/i;
+  
+  // Check if URL has a protocol
+  const hasProtocol = /^[a-z][a-z0-9+.-]*:/i.test(url);
+  
+  if (hasProtocol) {
+    // Validate that the protocol is allowed
+    if (!allowedProtocols.test(url)) {
+      console.warn('Blocked URL with disallowed protocol:', url);
+      return '';
+    }
+    
+    // Block javascript: and data: URIs that could execute scripts
+    if (/^(javascript|vbscript|data:text\/html)/i.test(url)) {
+      console.warn('Blocked potentially malicious URL:', url);
+      return '';
+    }
+  }
+  
+  // For data URLs, validate the format
+  if (url.startsWith('data:')) {
+    // Only allow image data URLs with base64 encoding
+    if (!/^data:image\/(png|jpeg|jpg|gif|webp|bmp|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(url)) {
+      console.warn('Blocked invalid data URL:', url.substring(0, 50) + '...');
+      return '';
+    }
+  }
+  
+  return url;
+}
+
+// Sanitize attribute value to prevent XSS
+function sanitizeAttribute(value) {
+  if (!value || typeof value !== 'string') return '';
+  
+  // Escape quotes and other potentially dangerous characters
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+// Sanitize HTML content for rich text editing
+// This allows safe HTML tags but removes dangerous attributes and scripts
+function sanitizeHtml(html) {
+  if (!html || typeof html !== 'string') return '';
+  
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  
+  // Remove script tags
+  const scripts = div.querySelectorAll('script');
+  scripts.forEach(script => script.remove());
+  
+  // Remove event handler attributes from all elements
+  const allElements = div.querySelectorAll('*');
+  allElements.forEach(el => {
+    // Remove all event handler attributes (onclick, onerror, etc.)
+    Array.from(el.attributes).forEach(attr => {
+      if (attr.name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+      }
+    });
+    
+    // Sanitize href and src attributes
+    if (el.hasAttribute('href')) {
+      const href = el.getAttribute('href');
+      const sanitized = sanitizeUrl(href);
+      if (sanitized) {
+        el.setAttribute('href', sanitized);
+      } else {
+        el.removeAttribute('href');
+      }
+    }
+    
+    if (el.hasAttribute('src')) {
+      const src = el.getAttribute('src');
+      const sanitized = sanitizeUrl(src);
+      if (sanitized) {
+        el.setAttribute('src', sanitized);
+      } else {
+        el.removeAttribute('src');
+      }
+    }
+  });
+  
   return div.innerHTML;
 }
 
