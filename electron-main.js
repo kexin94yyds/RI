@@ -816,6 +816,23 @@ ipcMain.handle('shell-open-external', async (event, url) => {
   }
 });
 
+// IPC 处理：导出功能 - 读取图片文件（返回 base64 编码）
+ipcMain.handle('export-read-image-file', async (event, fileName) => {
+  try {
+    const imagesDir = getImagesDir();
+    const imagePath = path.join(imagesDir, fileName);
+    
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return imageBuffer.toString('base64');
+    }
+    return null;
+  } catch (error) {
+    console.error('读取图片文件失败:', fileName, error);
+    return null;
+  }
+});
+
 // IPC 处理：窗口控制
 ipcMain.handle('window-show', async () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

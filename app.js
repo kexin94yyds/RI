@@ -2431,27 +2431,30 @@ async function exportAllModes() {
     String(now.getHours()).padStart(2, '0') +
     String(now.getMinutes()).padStart(2, '0');
   
-  // 为每个模式生成 Markdown 内容
+  // 为每个模式生成 Markdown 内容，同时收集图片文件
   const files = [];
+  const imageFiles = []; // 收集所有图片文件信息
+  
   for (const { mode, words } of modeDataList) {
-    const mdContent = generateModeMarkdown(mode, words);
+    const mdContent = generateModeMarkdown(mode, words, imageFiles);
     const fileName = `${mode.name}.md`;
     files.push({ name: fileName, content: mdContent });
   }
   
   // 使用 JSZip 打包（如果可用），否则逐个下载
   if (typeof JSZip !== 'undefined') {
-    await exportAsZip(files, timestamp);
+    await exportAsZipWithImages(files, imageFiles, timestamp);
   } else {
-    // 没有 JSZip，逐个下载文件
+    // 没有 JSZip，逐个下载文件（不含图片）
     await exportFilesSequentially(files, timestamp);
   }
   
-  showStatus(`已导出 ${modeDataList.length} 个模式，共 ${totalItems} 条内容`);
+  const imageCount = imageFiles.length;
+  showStatus(`已导出 ${modeDataList.length} 个模式，共 ${totalItems} 条内容${imageCount > 0 ? `，${imageCount} 张图片` : ''}`);
 }
 
-// 生成单个模式的 Markdown 内容
-function generateModeMarkdown(mode, words) {
+// 生成单个模式的 Markdown 内容，同时收集图片文件信息
+function generateModeMarkdown(mode, words, imageFiles = []) {
   const lines = [];
   
   // 标题
@@ -2470,10 +2473,12 @@ function generateModeMarkdown(mode, words) {
   words.forEach((word, index) => {
     let content = '';
     let itemType = 'text';
+    let fileName = '';
     
     if (typeof word === 'object') {
       content = word.content || '';
       itemType = word.type || 'text';
+      fileName = word.fileName || '';
     } else {
       content = String(word);
     }
@@ -2481,8 +2486,16 @@ function generateModeMarkdown(mode, words) {
     // 根据内容类型格式化
     if (itemType === 'image') {
       lines.push(`### ${index + 1}. [图片]`);
-      if (content) {
-        lines.push('');
+      lines.push('');
+      if (fileName) {
+        // 使用相对路径引用图片（图片将放在 images 子文件夹）
+        lines.push(`![${fileName}](images/${fileName})`);
+        // 收集图片文件信息
+        imageFiles.push({
+          fileName: fileName,
+          modeName: mode.name
+        });
+      } else if (content) {
         lines.push(`![图片](${content})`);
       }
     } else if (itemType === 'link') {
@@ -2512,7 +2525,47 @@ function generateModeMarkdown(mode, words) {
   return lines.join('\n');
 }
 
-// 使用 JSZip 打包导出
+// 使用 JSZip 打包导出（包含图片）
+async function exportAsZipWithImages(files, imageFiles, timestamp) {
+  const zip = new JSZip();
+  const folderName = `RI_导出_${timestamp}`;
+  const folder = zip.folder(folderName);
+  
+  // 添加 Markdown 文件
+  for (const file of files) {
+    folder.file(file.name, file.content);
+  }
+  
+  // 添加图片文件
+  if (imageFiles.length > 0 && window.electronAPI && window.electronAPI.export) {
+    const imagesFolder = folder.folder('images');
+    
+    for (const imageInfo of imageFiles) {
+      try {
+        // 通过 Electron API 读取图片文件
+        const imageData = await window.electronAPI.export.readImageFile(imageInfo.fileName);
+        if (imageData) {
+          // imageData 是 base64 编码的图片数据
+          imagesFolder.file(imageInfo.fileName, imageData, { base64: true });
+        }
+      } catch (err) {
+        console.error(`读取图片失败: ${imageInfo.fileName}`, err);
+      }
+    }
+  }
+  
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${folderName}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// 使用 JSZip 打包导出（旧版本，不含图片）
 async function exportAsZip(files, timestamp) {
   const zip = new JSZip();
   const folderName = `RI_导出_${timestamp}`;

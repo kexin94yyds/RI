@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     startMarkdownDrag: (content, fileName) => ipcRenderer.send('start-markdown-drag', { content, fileName })
   },
   
+  // 导出 API
+  export: {
+    // 读取图片文件（返回 base64 编码）
+    readImageFile: (fileName) => ipcRenderer.invoke('export-read-image-file', fileName)
+  },
+  
   // 通知 API
   sendNotification: (title, body) => {
     ipcRenderer.send('show-notification', { title, body });
