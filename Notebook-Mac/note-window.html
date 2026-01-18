@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Replace-Information - Notes</title>
+  <link rel="stylesheet" href="note-editor.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: #fff;
+      -webkit-app-region: drag;
+    }
+
+    .floating-md-editor {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      position: relative;
+      top: 0;           /* 覆盖外部样式的偏移，去除顶部空白 */
+      left: 0;          /* 保证贴合窗口 */
+      right: 0;         /* 保证贴合窗口 */
+      bottom: 0;        /* 保证贴合窗口 */
+      margin: 0;        /* 避免外边距造成空白 */
+      max-width: none;  /* 覆盖外部 90vw 限制，避免右侧留白 */
+      max-height: none; /* 覆盖外部 90vh 限制 */
+      box-shadow: none; /* 窗口版不需要悬浮阴影 */
+      border-radius: 8px; /* 与窗口圆角更协调 */
+      -webkit-app-region: no-drag;
+    }
+
+    /* 工具栏样式 */
+    .md-toolbar {
+      height: 30px;
+      padding: 5px 8px; /* 水平留白更自然 */
+      background-color: #f6f6f6;
+      border-bottom: 1px solid #e5e5e5;
+      display: flex;
+      align-items: center;
+      position: relative;
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+
+    /* 按钮容器 */
+    .button-container {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      -webkit-app-region: no-drag;
+      z-index: 2;        /* 盖过拖拽区域 */
+      pointer-events: auto; /* 确保按钮可点 */
+    }
+
+    /* macOS 风格按钮基础样式 */
+    .macos-btn {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: none;
+      color: transparent;
+      font-size: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      padding: 0;
+      transition: all 0.2s ease;
+      -webkit-app-region: no-drag;
+    }
+
+    /* 关闭按钮 - 红色 */
+    .md-close {
+      background-color: #ff5f56;
+    }
+
+    .md-close:hover {
+      background-color: #ff453a;
+      color: #4c0000;
+      transform: scale(1.1);
+    }
+
+    /* 导出按钮 - 蓝色 */
+    .md-export {
+      background-color: #007AFF;
+    }
+
+    .md-export:hover {
+      background-color: #0056CC;
+      color: #ffffff;
+      transform: scale(1.1);
+    }
+
+    /* 置顶按钮 - 橙色 */
+    .md-pin {
+      background-color: #FF9500;
+    }
+
+    .md-pin:hover {
+      background-color: #FF8C00;
+      transform: scale(1.1);
+    }
+
+    .md-pin.pinned {
+      background-color: #FF3B30;
+    }
+
+    .md-pin.pinned:hover {
+      background-color: #FF2D20;
+      transform: scale(1.1);
+    }
+
+    /* 标题 */
+    .md-title {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 13px;
+      font-weight: 500;
+      color: #333;
+      pointer-events: none;
+      white-space: nowrap; /* 不换行 */
+      overflow: hidden; /* 超出隐藏 */
+      text-overflow: ellipsis; /* 显示省略号 */
+      max-width: calc(100% - 300px); /* 确保不超出按钮区域，留出左右按钮空间 */
+    }
+
+    /* 模式切换器 */
+    .mode-switcher-container {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      -webkit-app-region: no-drag;
+      z-index: 2;        /* 盖过拖拽区域 */
+      pointer-events: auto; /* 保证可交互 */
+    }
+
+    .mode-switcher-btn {
+      padding: 3px 10px;
+      background-color: white;
+      color: #333;
+      border: 1px solid #333;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      max-width: 180px;         /* 名称更长也能展示 */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .mode-switcher-btn:hover {
+      background-color: #f5f5f5;
+      border-color: #000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .mode-dropdown {
+      position: absolute;
+      top: calc(100% + 5px);
+      right: 0;
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      min-width: 120px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+
+    .mode-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      transition: all 0.2s;
+      margin: 4px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+    }
+
+    .mode-item:hover {
+      background-color: #f5f5f5;
+      border-color: #999;
+    }
+
+    .mode-item.active {
+      background-color: #f5f5f5;
+      color: #000;
+      border-color: #000;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      font-weight: 600;
+    }
+
+    .check-mark {
+      color: #000;
+      font-weight: bold;
+    }
+
+    /* 编辑器区域 */
+    .md-editor {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      outline: none;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333 !important; /* 强制设置文字颜色 */
+      -webkit-text-fill-color: #333 !important; /* Safari/Chrome 特殊处理 */
+      -webkit-app-region: no-drag;
+    }
+    
+    /* 确保所有子元素继承颜色 */
+    .md-editor * {
+      color: inherit !important;
+      -webkit-text-fill-color: inherit !important;
+    }
+
+    .md-editor:empty:before {
+      content: attr(data-placeholder);
+      color: #aaa;
+      pointer-events: none;
+    }
+
+    .md-editor img {
+      max-width: 100%;
+      height: auto;
+      margin: 10px 0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* 通知样式 */
+    .notification {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #000;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      border: 1px solid #333;
+      z-index: 10000;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      to {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+      }
+    }
+
+    /* 搜索框样式 */
+    .search-box {
+      position: absolute;
+      top: 45px;
+      right: 20px;
+      background: white;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      padding: 8px 12px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 1000;
+      -webkit-app-region: no-drag;
+    }
+
+    .search-box.active {
+      display: flex;
+    }
+
+    .search-input {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 13px;
+      width: 180px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: #007AFF;
+    }
+
+    .search-count {
+      font-size: 12px;
+      color: #666;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .search-btn {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .search-btn:hover {
+      background: #f5f5f5;
+      border-color: #999;
+    }
+
+    .search-close {
+      color: #999;
+      font-weight: bold;
+    }
+
+    .search-close:hover {
+      color: #ff5f56;
+      background: #fff0f0;
+      border-color: #ff5f56;
+    }
+
+    /* 搜索高亮样式 */
+    .search-highlight {
+      background-color: #ffeb3b;
+      color: #000;
+      border-radius: 2px;
+    }
+
+    .search-highlight-active {
+      background-color: #ff9800;
+      color: #fff;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="floating-md-editor">
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <!-- macOS 风格按钮 -->
+      <div class="button-container">
+        <button class="macos-btn md-close" id="close-btn" title="关闭">✕</button>
+        <button class="macos-btn md-export" id="export-btn" title="导出为Markdown">⬆</button>
+      </div>
+
+      <!-- 标题 -->
+      <div class="md-title" id="md-title">📝 笔记</div>
+
+      <!-- 模式切换器 -->
+      <div class="mode-switcher-container">
+        <button class="mode-switcher-btn" id="mode-switcher-btn">默认 ▾</button>
+        <div class="mode-dropdown" id="mode-dropdown">
+          <!-- 模式列表动态生成 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 编辑器 -->
+    <div 
+      class="md-editor" 
+      id="md-editor" 
+      contenteditable="true" 
+      data-placeholder="在此输入内容或粘贴富文本...">
+    </div>
+
+    <!-- 搜索框 -->
+    <div class="search-box" id="search-box">
+      <input 
+        type="text" 
+        class="search-input" 
+        id="search-input" 
+        placeholder="搜索..."
+        autocomplete="off"
+      />
+      <span class="search-count" id="search-count">0/0</span>
+      <button class="search-btn" id="search-prev" title="上一个 (Shift+Enter)">↑</button>
+      <button class="search-btn" id="search-next" title="下一个 (Enter)">↓</button>
+      <button class="search-btn search-close" id="search-close" title="关闭 (Esc)">✕</button>
+    </div>
+  </div>
+
+  <script type="module" src="note-window.js"></script>
+</body>
+</html>

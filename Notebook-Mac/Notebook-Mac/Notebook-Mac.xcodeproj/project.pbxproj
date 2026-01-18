@@ -1,0 +1,556 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		183426BE2F04CB5F00857CFB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 183426A72F04CB5D00857CFB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 183426AE2F04CB5D00857CFB;
+			remoteInfo = "Notebook-Mac";
+		};
+		183426C82F04CB5F00857CFB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 183426A72F04CB5D00857CFB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 183426AE2F04CB5D00857CFB;
+			remoteInfo = "Notebook-Mac";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		183426AF2F04CB5D00857CFB /* Notebook-Mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Notebook-Mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		183426BD2F04CB5F00857CFB /* Notebook-MacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Notebook-MacTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		183426C72F04CB5F00857CFB /* Notebook-MacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Notebook-MacUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		183426B12F04CB5D00857CFB /* Notebook-Mac */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Notebook-Mac";
+			sourceTree = "<group>";
+		};
+		183426C02F04CB5F00857CFB /* Notebook-MacTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Notebook-MacTests";
+			sourceTree = "<group>";
+		};
+		183426CA2F04CB5F00857CFB /* Notebook-MacUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Notebook-MacUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		183426AC2F04CB5D00857CFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426BA2F04CB5F00857CFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426C42F04CB5F00857CFB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		183426A62F04CB5D00857CFB = {
+			isa = PBXGroup;
+			children = (
+				183426B12F04CB5D00857CFB /* Notebook-Mac */,
+				183426C02F04CB5F00857CFB /* Notebook-MacTests */,
+				183426CA2F04CB5F00857CFB /* Notebook-MacUITests */,
+				183426B02F04CB5D00857CFB /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		183426B02F04CB5D00857CFB /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				183426AF2F04CB5D00857CFB /* Notebook-Mac.app */,
+				183426BD2F04CB5F00857CFB /* Notebook-MacTests.xctest */,
+				183426C72F04CB5F00857CFB /* Notebook-MacUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		183426AE2F04CB5D00857CFB /* Notebook-Mac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 183426D12F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-Mac" */;
+			buildPhases = (
+				183426AB2F04CB5D00857CFB /* Sources */,
+				183426AC2F04CB5D00857CFB /* Frameworks */,
+				183426AD2F04CB5D00857CFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				183426B12F04CB5D00857CFB /* Notebook-Mac */,
+			);
+			name = "Notebook-Mac";
+			packageProductDependencies = (
+			);
+			productName = "Notebook-Mac";
+			productReference = 183426AF2F04CB5D00857CFB /* Notebook-Mac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		183426BC2F04CB5F00857CFB /* Notebook-MacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 183426D42F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-MacTests" */;
+			buildPhases = (
+				183426B92F04CB5F00857CFB /* Sources */,
+				183426BA2F04CB5F00857CFB /* Frameworks */,
+				183426BB2F04CB5F00857CFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				183426BF2F04CB5F00857CFB /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				183426C02F04CB5F00857CFB /* Notebook-MacTests */,
+			);
+			name = "Notebook-MacTests";
+			packageProductDependencies = (
+			);
+			productName = "Notebook-MacTests";
+			productReference = 183426BD2F04CB5F00857CFB /* Notebook-MacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		183426C62F04CB5F00857CFB /* Notebook-MacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 183426D72F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-MacUITests" */;
+			buildPhases = (
+				183426C32F04CB5F00857CFB /* Sources */,
+				183426C42F04CB5F00857CFB /* Frameworks */,
+				183426C52F04CB5F00857CFB /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				183426C92F04CB5F00857CFB /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				183426CA2F04CB5F00857CFB /* Notebook-MacUITests */,
+			);
+			name = "Notebook-MacUITests";
+			packageProductDependencies = (
+			);
+			productName = "Notebook-MacUITests";
+			productReference = 183426C72F04CB5F00857CFB /* Notebook-MacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		183426A72F04CB5D00857CFB /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					183426AE2F04CB5D00857CFB = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					183426BC2F04CB5F00857CFB = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 183426AE2F04CB5D00857CFB;
+					};
+					183426C62F04CB5F00857CFB = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 183426AE2F04CB5D00857CFB;
+					};
+				};
+			};
+			buildConfigurationList = 183426AA2F04CB5D00857CFB /* Build configuration list for PBXProject "Notebook-Mac" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 183426A62F04CB5D00857CFB;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 183426B02F04CB5D00857CFB /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				183426AE2F04CB5D00857CFB /* Notebook-Mac */,
+				183426BC2F04CB5F00857CFB /* Notebook-MacTests */,
+				183426C62F04CB5F00857CFB /* Notebook-MacUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		183426AD2F04CB5D00857CFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426BB2F04CB5F00857CFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426C52F04CB5F00857CFB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		183426AB2F04CB5D00857CFB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426B92F04CB5F00857CFB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		183426C32F04CB5F00857CFB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		183426BF2F04CB5F00857CFB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 183426AE2F04CB5D00857CFB /* Notebook-Mac */;
+			targetProxy = 183426BE2F04CB5F00857CFB /* PBXContainerItemProxy */;
+		};
+		183426C92F04CB5F00857CFB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 183426AE2F04CB5D00857CFB /* Notebook-Mac */;
+			targetProxy = 183426C82F04CB5F00857CFB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		183426CF2F04CB5F00857CFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		183426D02F04CB5F00857CFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		183426D22F04CB5F00857CFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Notebook-Mac/Notebook_Mac.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-Mac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		183426D32F04CB5F00857CFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Notebook-Mac/Notebook_Mac.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-Mac";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		183426D52F04CB5F00857CFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-MacTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Notebook-Mac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Notebook-Mac";
+			};
+			name = Debug;
+		};
+		183426D62F04CB5F00857CFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-MacTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Notebook-Mac.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Notebook-Mac";
+			};
+			name = Release;
+		};
+		183426D82F04CB5F00857CFB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-MacUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "Notebook-Mac";
+			};
+			name = Debug;
+		};
+		183426D92F04CB5F00857CFB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UM3Z9G5DNH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ri.Notebook-MacUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "Notebook-Mac";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		183426AA2F04CB5D00857CFB /* Build configuration list for PBXProject "Notebook-Mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				183426CF2F04CB5F00857CFB /* Debug */,
+				183426D02F04CB5F00857CFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		183426D12F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-Mac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				183426D22F04CB5F00857CFB /* Debug */,
+				183426D32F04CB5F00857CFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		183426D42F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-MacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				183426D52F04CB5F00857CFB /* Debug */,
+				183426D62F04CB5F00857CFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		183426D72F04CB5F00857CFB /* Build configuration list for PBXNativeTarget "Notebook-MacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				183426D82F04CB5F00857CFB /* Debug */,
+				183426D92F04CB5F00857CFB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 183426A72F04CB5D00857CFB /* Project object */;
+}
