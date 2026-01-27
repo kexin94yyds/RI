@@ -2444,19 +2444,77 @@ async function exportAllModes() {
 }
 
 // 导出并同步到 GitHub
+// 自定义确认对话框（避免阻塞主线程）
+function showConfirmDialog(message, onConfirm, onCancel) {
+  const overlay = document.createElement('div');
+  overlay.className = 'confirm-dialog-overlay';
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <div class="confirm-message">${message.replace(/\n/g, '<br>')}</div>
+      <div class="confirm-buttons">
+        <button class="confirm-btn cancel">取消</button>
+        <button class="confirm-btn ok">确定</button>
+      </div>
+    </div>
+  `;
+  
+  // 添加样式
+  let style = document.getElementById('confirm-dialog-style');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'confirm-dialog-style';
+    style.textContent = `
+      .confirm-dialog-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); display: flex;
+        align-items: center; justify-content: center; z-index: 10002;
+      }
+      .confirm-dialog {
+        background: white; border-radius: 12px; padding: 24px;
+        max-width: 400px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      }
+      .confirm-message { margin-bottom: 20px; line-height: 1.6; }
+      .confirm-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+      .confirm-btn { padding: 8px 20px; border-radius: 6px; cursor: pointer; border: none; }
+      .confirm-btn.cancel { background: #f0f0f0; }
+      .confirm-btn.ok { background: #007AFF; color: white; }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(overlay);
+  
+  overlay.querySelector('.cancel').onclick = () => {
+    overlay.remove();
+    if (onCancel) onCancel();
+  };
+  overlay.querySelector('.ok').onclick = () => {
+    overlay.remove();
+    if (onConfirm) onConfirm();
+  };
+}
+
 async function exportAndSyncToGitHub() {
   try {
-    // 0. 先询问是否需要清理
+    // 0. 先询问是否需要清理（使用自定义对话框）
     const stats = await getDbStats();
-    const shouldCleanup = confirm(
-      `当前数据库共 ${stats.wordsCount} 条记录\n\n` +
-      `是否在同步后清理 30 天前的旧数据？\n` +
-      `（会先备份到 GitHub，再清理本地）\n\n` +
-      `点击"确定"：备份 + 清理\n` +
-      `点击"取消"：仅备份不清理`
-    );
+    
+    const shouldCleanup = await new Promise(resolve => {
+      showConfirmDialog(
+        `当前数据库共 ${stats.wordsCount} 条记录\n\n` +
+        `是否在同步后清理 30 天前的旧数据？\n` +
+        `（会先备份到 GitHub，再清理本地）\n\n` +
+        `点击"确定"：备份 + 清理\n` +
+        `点击"取消"：仅备份不清理`,
+        () => resolve(true),
+        () => resolve(false)
+      );
+    });
     
     showStatus('正在同步到 GitHub...');
+    
+    // 让出事件循环，确保 UI 更新
+    await new Promise(r => setTimeout(r, 0));
     
     // 1. 先导出到文件系统（备份）
     await initFileStorage();
@@ -2464,13 +2522,18 @@ async function exportAndSyncToGitHub() {
     const allModes = await getAllModes();
     
     if (allModes.length === 0) {
-      alert('暂无模式可导出');
+      showStatus('暂无模式可导出');
       return;
     }
     
-    // 强制导出所有数据作为备份
-    const count = await exportAllDataToFiles(allModes, getWordsByMode, true);
+    // 强制导出所有数据作为备份（带进度回调）
+    const count = await exportAllDataToFiles(allModes, getWordsByMode, true, (progress) => {
+      showStatus(`正在备份... ${progress}%`);
+    });
     showStatus(`已备份 ${count} 条笔记，正在推送...`);
+    
+    // 让出事件循环
+    await new Promise(r => setTimeout(r, 0));
     
     // 2. 同步到 GitHub
     let syncSuccess = false;
@@ -2486,7 +2549,6 @@ async function exportAndSyncToGitHub() {
           showStatus('✅ 已同步到 GitHub');
         } else {
           showStatus('❌ 同步失败: ' + retryResult.message);
-          alert('同步失败: ' + retryResult.message);
         }
       }
     } else if (result.success) {
@@ -2494,23 +2556,20 @@ async function exportAndSyncToGitHub() {
       showStatus('✅ 已同步到 GitHub');
     } else {
       showStatus('❌ 同步失败: ' + result.message);
-      alert('同步失败: ' + result.message);
     }
     
     // 3. 如果用户选择清理且同步成功
     if (syncSuccess && shouldCleanup) {
       showStatus('正在清理旧数据...');
       const deleted = await cleanupOldData(30);
-      showStatus(`✅ 已清理 ${deleted} 条旧数据`);
-      alert(`同步并清理完成！\n\n备份了 ${count} 条笔记\n清理了 ${deleted} 条 30 天前的旧数据`);
+      showStatus(`✅ 同步完成，清理了 ${deleted} 条旧数据`);
       await loadModes();
     } else if (syncSuccess) {
-      alert(`同步完成！\n\n已备份 ${count} 条笔记到 GitHub`);
+      showStatus(`✅ 同步完成，备份了 ${count} 条笔记`);
     }
   } catch (error) {
     console.error('同步到 GitHub 失败:', error);
     showStatus('❌ 同步失败: ' + error.message);
-    alert('同步失败: ' + error.message);
   }
 }
 

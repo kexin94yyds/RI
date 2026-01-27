@@ -318,8 +318,8 @@ async function saveLastExportTime(time) {
   await saveConfig(config);
 }
 
-// 增量导出：只导出新增/修改的笔记（内存优化版）
-export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = false) {
+// 增量导出：只导出新增/修改的笔记（内存优化版，支持进度回调）
+export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = false, onProgress = null) {
   try {
     await initFileStorage();
     
@@ -327,29 +327,34 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
     const currentTime = Date.now();
     let exportedCount = 0;
     let skippedCount = 0;
+    let totalNotes = 0;
+    let processedNotes = 0;
     
-    // 用于去重的 Set（只存储文件名哈希，减少内存）
+    // 先统计总数（用于进度计算）
+    for (const mode of modes) {
+      const notes = await getNotesByMode(mode.id);
+      totalNotes += notes.length;
+    }
+    
+    // 用于去重的 Set
     const exportedFiles = new Set();
     
     for (const mode of modes) {
-      // 创建模式文件夹
       await createModeFolder(mode.name);
-      
-      // 获取该模式的笔记
       const notes = await getNotesByMode(mode.id);
       
-      // 分批处理，每批 50 条，避免内存爆炸
+      // 分批处理
       const batchSize = 50;
       for (let i = 0; i < notes.length; i += batchSize) {
         const batch = notes.slice(i, i + batchSize);
         
         for (const note of batch) {
+          processedNotes++;
+          
           if (note.content || note.html) {
             const content = note.html || note.content;
-            // 优先使用 updatedAt（修复：确保更新的笔记被导出）
             const noteTime = note.updatedAt || note.createdAt || Date.now();
             
-            // 增量导出：跳过上次导出之前的笔记
             if (!forceAll && noteTime < lastExportTime) {
               skippedCount++;
               continue;
@@ -359,7 +364,6 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
             const title = extractTitleFromContent(content);
             const fileName = `${date}-${title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50)}.md`;
             
-            // 去重：相同文件名只导出一次
             const fileKey = `${mode.name}/${fileName}`;
             if (exportedFiles.has(fileKey)) {
               skippedCount++;
@@ -372,19 +376,18 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
           }
         }
         
-        // 每批处理后释放内存
-        if (typeof global !== 'undefined' && global.gc) {
-          global.gc();
+        // 更新进度并让出事件循环
+        if (onProgress && totalNotes > 0) {
+          const progress = Math.round((processedNotes / totalNotes) * 100);
+          onProgress(progress);
         }
+        await new Promise(r => setTimeout(r, 0)); // 让出事件循环
       }
       
-      // 处理完一个模式后，清空 notes 引用
       notes.length = 0;
     }
     
-    // 保存本次导出时间
     await saveLastExportTime(currentTime);
-    
     console.log(`✓ 导出完成，新增 ${exportedCount} 条，跳过 ${skippedCount} 条`);
     return exportedCount;
   } catch (error) {
