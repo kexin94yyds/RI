@@ -1345,6 +1345,20 @@ function setupSearchListeners() {
       return;
     }
     
+    // Cmd+Option+左箭头 - 切换到左边标签
+    if (isMod && e.altKey && e.key === 'ArrowLeft') {
+      e.preventDefault();
+      switchToPrevTab();
+      return;
+    }
+    
+    // Cmd+Option+右箭头 - 切换到右边标签
+    if (isMod && e.altKey && e.key === 'ArrowRight') {
+      e.preventDefault();
+      switchToNextTab();
+      return;
+    }
+    
     // Esc 键关闭搜索框
     if (e.key === 'Escape' && searchBox.classList.contains('active')) {
       closeSearchBox();
@@ -1848,4 +1862,22 @@ function markCurrentTabDirty() {
     currentTab.isDirty = true;
     renderTabs();
   }
+}
+
+// 切换到上一个标签（Cmd+Option+左箭头）
+function switchToPrevTab() {
+  if (tabs.length <= 1) return;
+  
+  const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+  const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  switchToTab(tabs[prevIndex].id);
+}
+
+// 切换到下一个标签（Cmd+Option+右箭头）
+function switchToNextTab() {
+  if (tabs.length <= 1) return;
+  
+  const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+  const nextIndex = (currentIndex + 1) % tabs.length;
+  switchToTab(tabs[nextIndex].id);
 }
