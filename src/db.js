@@ -320,15 +320,47 @@ export async function deleteNotesByMode(modeId) {
 
 // ==================== Words 管理 ====================
 
-export async function getWordsByMode(modeId) {
+export async function getWordsByMode(modeId, limit = null, offset = 0) {
   await ensureDb();
 
   return runWithRetry(() => {
-    const transaction = db.transaction([WORDS_STORE], 'readonly');
-    const store = transaction.objectStore(WORDS_STORE);
-    const index = store.index('modeId');
-    const request = index.getAll(modeId);
-    return wrapRequest(request, value => value || []);
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([WORDS_STORE], 'readonly');
+      const store = transaction.objectStore(WORDS_STORE);
+      const index = store.index('modeId');
+      
+      // 如果不需要分页，使用 getAll（兼容旧代码）
+      if (limit === null) {
+        const request = index.getAll(modeId);
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+        return;
+      }
+      
+      // 分页查询
+      const results = [];
+      let skipped = 0;
+      const request = index.openCursor(IDBKeyRange.only(modeId));
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          if (skipped < offset) {
+            skipped++;
+            cursor.continue();
+          } else if (results.length < limit) {
+            results.push(cursor.value);
+            cursor.continue();
+          } else {
+            resolve(results);
+          }
+        } else {
+          resolve(results);
+        }
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
   });
 }
 

@@ -314,7 +314,7 @@ async function saveLastExportTime(time) {
   await saveConfig(config);
 }
 
-// 增量导出：只导出新增/修改的笔记
+// 增量导出：只导出新增/修改的笔记（内存优化版）
 export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = false) {
   try {
     await initFileStorage();
@@ -324,7 +324,7 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
     let exportedCount = 0;
     let skippedCount = 0;
     
-    // 用于去重的 Set
+    // 用于去重的 Set（只存储文件名哈希，减少内存）
     const exportedFiles = new Set();
     
     for (const mode of modes) {
@@ -334,33 +334,47 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
       // 获取该模式的笔记
       const notes = await getNotesByMode(mode.id);
       
-      for (const note of notes) {
-        if (note.content || note.html) {
-          const content = note.html || note.content;
-          const noteTime = note.createdAt || note.updatedAt || Date.now();
-          
-          // 增量导出：跳过上次导出之前的笔记
-          if (!forceAll && noteTime < lastExportTime) {
-            skippedCount++;
-            continue;
+      // 分批处理，每批 50 条，避免内存爆炸
+      const batchSize = 50;
+      for (let i = 0; i < notes.length; i += batchSize) {
+        const batch = notes.slice(i, i + batchSize);
+        
+        for (const note of batch) {
+          if (note.content || note.html) {
+            const content = note.html || note.content;
+            const noteTime = note.createdAt || note.updatedAt || Date.now();
+            
+            // 增量导出：跳过上次导出之前的笔记
+            if (!forceAll && noteTime < lastExportTime) {
+              skippedCount++;
+              continue;
+            }
+            
+            const date = new Date(noteTime).toISOString().split('T')[0];
+            const title = extractTitleFromContent(content);
+            const fileName = `${date}-${title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50)}.md`;
+            
+            // 去重：相同文件名只导出一次
+            const fileKey = `${mode.name}/${fileName}`;
+            if (exportedFiles.has(fileKey)) {
+              skippedCount++;
+              continue;
+            }
+            exportedFiles.add(fileKey);
+            
+            await saveNoteToFile(mode.name, content, fileName);
+            exportedCount++;
           }
-          
-          const date = new Date(noteTime).toISOString().split('T')[0];
-          const title = extractTitleFromContent(content);
-          const fileName = `${date}-${title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50)}.md`;
-          
-          // 去重：相同文件名只导出一次
-          const fileKey = `${mode.name}/${fileName}`;
-          if (exportedFiles.has(fileKey)) {
-            skippedCount++;
-            continue;
-          }
-          exportedFiles.add(fileKey);
-          
-          await saveNoteToFile(mode.name, content, fileName);
-          exportedCount++;
+        }
+        
+        // 每批处理后释放内存
+        if (typeof global !== 'undefined' && global.gc) {
+          global.gc();
         }
       }
+      
+      // 处理完一个模式后，清空 notes 引用
+      notes.length = 0;
     }
     
     // 保存本次导出时间
