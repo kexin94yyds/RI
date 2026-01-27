@@ -75,6 +75,10 @@ export async function saveConfig(config) {
 // 获取模式文件夹路径
 export async function getModeDir(modeName) {
   const dir = await getNotesDir();
+  // 类型校验
+  if (!modeName || typeof modeName !== 'string') {
+    modeName = 'default';
+  }
   // 清理模式名称，移除不安全字符
   const safeName = modeName.replace(/[\\/:*?"<>|]/g, '_');
   return `${dir}/${safeName}`;
@@ -342,7 +346,8 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
         for (const note of batch) {
           if (note.content || note.html) {
             const content = note.html || note.content;
-            const noteTime = note.createdAt || note.updatedAt || Date.now();
+            // 优先使用 updatedAt（修复：确保更新的笔记被导出）
+            const noteTime = note.updatedAt || note.createdAt || Date.now();
             
             // 增量导出：跳过上次导出之前的笔记
             if (!forceAll && noteTime < lastExportTime) {

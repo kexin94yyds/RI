@@ -350,49 +350,71 @@ export async function getWordsByMode(modeId, limit = null, offset = 0) {
 }
 
 // 分批读取大量数据（避免内存爆炸）
+// 注意：onBatch 必须是同步函数，避免 IndexedDB 事务超时
 export async function getWordsByModeBatched(modeId, batchSize = 100, onBatch) {
   await ensureDb();
   
-  return runWithRetry(() => {
+  // 收集所有批次，事务完成后再处理
+  const batches = [];
+  let totalCount = 0;
+  
+  await runWithRetry(() => {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction([WORDS_STORE], 'readonly');
       const store = transaction.objectStore(WORDS_STORE);
       const index = store.index('modeId');
       
       let batch = [];
-      let totalCount = 0;
       
       const request = index.openCursor(IDBKeyRange.only(modeId));
       
-      request.onsuccess = async (event) => {
+      request.onsuccess = (event) => {
         const cursor = event.target.result;
         if (cursor) {
           batch.push(cursor.value);
           totalCount++;
           
-          // 达到批次大小时处理
+          // 达到批次大小时保存批次
           if (batch.length >= batchSize) {
-            if (onBatch) await onBatch(batch);
-            batch = []; // 清空批次释放内存
+            batches.push([...batch]);
+            batch = [];
           }
           
           cursor.continue();
         } else {
-          // 处理最后一批
-          if (batch.length > 0 && onBatch) {
-            await onBatch(batch);
+          // 保存最后一批
+          if (batch.length > 0) {
+            batches.push([...batch]);
           }
-          resolve(totalCount);
+          resolve();
         }
       };
       
       request.onerror = () => reject(request.error);
     });
   });
+  
+  // 事务完成后，逐批处理（可以安全使用 async）
+  if (onBatch) {
+    for (const batch of batches) {
+      try {
+        await onBatch(batch);
+      } catch (e) {
+        console.error('批处理失败:', e);
+      }
+    }
+  }
+  
+  return totalCount;
 }
 
 export async function saveWord(modeId, wordData) {
   await ensureDb();
+  
+  // 空值校验
+  if (!wordData) {
+    wordData = { content: '', type: 'text' };
+  }
 
   const word = {
     modeId,
@@ -618,9 +640,14 @@ export async function cleanupOldData(daysToKeep = 30) {
   let deletedCount = 0;
   
   return runWithRetry(async () => {
-    // 使用 relaxed durability 提升写入性能（Chrome 支持）
-    const options = { durability: 'relaxed' };
-    const transaction = db.transaction([WORDS_STORE], 'readwrite', options);
+    // 尝试使用 relaxed durability（Chrome 支持），不支持则回退到默认
+    let transaction;
+    try {
+      transaction = db.transaction([WORDS_STORE], 'readwrite', { durability: 'relaxed' });
+    } catch (e) {
+      // 旧环境不支持 durability 选项，回退到默认事务
+      transaction = db.transaction([WORDS_STORE], 'readwrite');
+    }
     const store = transaction.objectStore(WORDS_STORE);
     
     return new Promise((resolve, reject) => {
