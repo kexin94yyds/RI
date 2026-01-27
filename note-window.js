@@ -1621,7 +1621,24 @@ function updateSearchCount() {
 // 标签页状态
 let tabs = [];
 let activeTabId = null;
-let untitledCounter = 0;
+
+// 获取下一个可用的 Untitled 编号（复用已关闭的编号）
+function getNextUntitledNumber() {
+  const usedNumbers = new Set();
+  tabs.forEach(tab => {
+    const match = tab.title.match(/^Untitled-(\d+)$/);
+    if (match) {
+      usedNumbers.add(parseInt(match[1], 10));
+    }
+  });
+  
+  // 从 1 开始找第一个未使用的编号
+  let num = 1;
+  while (usedNumbers.has(num)) {
+    num++;
+  }
+  return num;
+}
 
 // 初始化状态栏
 function initStatusBar() {
@@ -1641,10 +1658,9 @@ function initStatusBar() {
   
   // 初始化第一个标签
   if (tabs.length === 0) {
-    untitledCounter++;
     const firstTab = {
       id: generateTabId(),
-      title: `Untitled-${untitledCounter}`,
+      title: `Untitled-${getNextUntitledNumber()}`,
       content: '',
       isDirty: false
     };
@@ -1669,11 +1685,10 @@ function createNewNote() {
   // 保存当前标签内容
   saveCurrentTabContent();
   
-  // 创建新标签
-  untitledCounter++;
+  // 创建新标签（复用已关闭的编号）
   const newTab = {
     id: generateTabId(),
-    title: `Untitled-${untitledCounter}`,
+    title: `Untitled-${getNextUntitledNumber()}`,
     content: '',
     isDirty: false
   };
