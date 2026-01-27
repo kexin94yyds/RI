@@ -2289,6 +2289,29 @@ function showStatus(message) {
   const statusEl = document.getElementById("save-status");
   if (statusEl) {
     statusEl.innerText = message;
+  }
+  
+  // 同时显示在底部状态栏（更明显）
+  let floatStatus = document.getElementById("float-status");
+  if (!floatStatus) {
+    floatStatus = document.createElement('div');
+    floatStatus.id = 'float-status';
+    floatStatus.style.cssText = `
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); color: white; padding: 12px 24px;
+      border-radius: 8px; z-index: 10000; font-size: 14px;
+      transition: opacity 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+    document.body.appendChild(floatStatus);
+  }
+  floatStatus.textContent = message;
+  floatStatus.style.opacity = '1';
+  
+  // 如果是完成状态，3秒后隐藏
+  if (message.includes('✅') || message.includes('❌')) {
+    setTimeout(() => {
+      if (floatStatus) floatStatus.style.opacity = '0';
+    }, 3000);
     setTimeout(() => {
       statusEl.innerText = "";
     }, 3000);
