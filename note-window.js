@@ -1638,7 +1638,23 @@ function createNewNote() {
   // 聚焦编辑器
   editor.focus();
   
-  showNotification(`✓ 新建笔记: ${newTab.title}`);
+  showNotification(`✓ 新建笔记`);
+}
+
+// 获取标签显示标题（内容第一行或默认标题）
+function getTabDisplayTitle(tab) {
+  if (tab.content) {
+    // 从 HTML 内容中提取第一行文本
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = tab.content;
+    const text = tempDiv.textContent || tempDiv.innerText || '';
+    const firstLine = text.split('\n')[0].trim();
+    if (firstLine) {
+      // 截取前 20 个字符
+      return firstLine.length > 20 ? firstLine.substring(0, 20) + '...' : firstLine;
+    }
+  }
+  return tab.title; // 默认返回 Untitled-X
 }
 
 // 关闭当前标签（Cmd+W）
@@ -1676,6 +1692,8 @@ function saveCurrentTabContent() {
   if (currentTab) {
     currentTab.content = editor.innerHTML;
     currentTab.isDirty = false;
+    // 更新标签显示（标题可能变化）
+    renderTabs();
   }
 }
 
@@ -1722,10 +1740,10 @@ function renderTabs() {
     tabEl.className = `tab-pill${tab.id === activeTabId ? ' active' : ''}`;
     tabEl.dataset.tabId = tab.id;
     
-    // 标题
+    // 标题（显示内容第一行）
     const titleSpan = document.createElement('span');
     titleSpan.className = 'tab-title';
-    titleSpan.textContent = tab.title;
+    titleSpan.textContent = getTabDisplayTitle(tab);
     tabEl.appendChild(titleSpan);
     
     // 脏状态指示器
