@@ -438,8 +438,11 @@ function setupEventListeners() {
 function handleEditorInput() {
   editorContent = editor.innerHTML;
   
-  // 更新标题
+  // 更新顶部标题
   updateTitle();
+  
+  // 更新底部标签标题（与顶部同步）
+  updateCurrentTabTitle();
   
   // 更新字数统计
   updateWordCount();
@@ -1643,10 +1646,13 @@ function createNewNote() {
 
 // 获取标签显示标题（内容第一行或默认标题）
 function getTabDisplayTitle(tab) {
-  if (tab.content) {
+  // 如果是当前活动标签，使用编辑器实时内容
+  const content = (tab.id === activeTabId) ? editor.innerHTML : tab.content;
+  
+  if (content) {
     // 从 HTML 内容中提取第一行文本
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = tab.content;
+    tempDiv.innerHTML = content;
     const text = tempDiv.textContent || tempDiv.innerText || '';
     const firstLine = text.split('\n')[0].trim();
     if (firstLine) {
@@ -1655,6 +1661,16 @@ function getTabDisplayTitle(tab) {
     }
   }
   return tab.title; // 默认返回 Untitled-X
+}
+
+// 更新当前标签的显示标题（与顶部标题同步）
+function updateCurrentTabTitle() {
+  const currentTab = tabs.find(t => t.id === activeTabId);
+  if (currentTab) {
+    // 更新标签内容以便获取正确的标题
+    currentTab.content = editor.innerHTML;
+    renderTabs();
+  }
 }
 
 // 关闭当前标签（Cmd+W）
