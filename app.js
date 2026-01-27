@@ -2479,23 +2479,89 @@ async function exportAndSyncToGitHub() {
 // 显示 GitHub 设置对话框
 function showGitHubSetupDialog() {
   return new Promise((resolve) => {
+    // 添加样式（如果不存在）
+    let style = document.getElementById('github-dialog-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'github-dialog-style';
+      style.textContent = `
+        .github-dialog-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10001;
+        }
+        .github-dialog {
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .github-dialog h3 {
+          margin: 0 0 16px 0;
+          font-size: 18px;
+        }
+        .github-dialog input {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          margin-bottom: 16px;
+          box-sizing: border-box;
+          font-size: 14px;
+        }
+        .github-dialog input:focus {
+          outline: none;
+          border-color: #007AFF;
+        }
+        .github-dialog-buttons {
+          display: flex;
+          gap: 8px;
+        }
+        .github-dialog-buttons button {
+          flex: 1;
+          padding: 10px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .github-cancel-btn {
+          background: #f0f0f0;
+          color: #666;
+        }
+        .github-confirm-btn {
+          background: #007AFF;
+          color: white;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
     const dialog = document.createElement('div');
-    dialog.className = 'export-dialog-overlay';
+    dialog.className = 'github-dialog-overlay';
     dialog.innerHTML = `
-      <div class="export-dialog">
+      <div class="github-dialog">
         <h3>设置 GitHub 仓库</h3>
         <p style="font-size: 13px; color: #666; margin-bottom: 16px;">
           请先在 GitHub 创建一个私有仓库，然后输入仓库地址：
         </p>
         <input type="text" id="github-repo-url" 
-          placeholder="https://github.com/用户名/仓库名.git"
-          style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 16px; box-sizing: border-box;">
+          placeholder="https://github.com/用户名/仓库名.git">
         <p style="font-size: 11px; color: #999; margin-bottom: 16px;">
           提示：确保你已配置 Git SSH 密钥或 HTTPS 凭据
         </p>
-        <div style="display: flex; gap: 8px;">
-          <button class="export-cancel" style="flex: 1;">取消</button>
-          <button id="github-confirm" style="flex: 1; padding: 10px; border: none; border-radius: 6px; background: #007AFF; color: white; cursor: pointer;">确定</button>
+        <div class="github-dialog-buttons">
+          <button class="github-cancel-btn">取消</button>
+          <button class="github-confirm-btn">确定</button>
         </div>
       </div>
     `;
@@ -2505,22 +2571,40 @@ function showGitHubSetupDialog() {
     const input = dialog.querySelector('#github-repo-url');
     input.focus();
     
-    dialog.querySelector('#github-confirm').addEventListener('click', () => {
+    const cleanup = () => {
+      if (dialog.parentNode) {
+        document.body.removeChild(dialog);
+      }
+    };
+    
+    dialog.querySelector('.github-confirm-btn').addEventListener('click', () => {
       const url = input.value.trim();
-      document.body.removeChild(dialog);
+      cleanup();
       resolve(url || null);
     });
     
-    dialog.querySelector('.export-cancel').addEventListener('click', () => {
-      document.body.removeChild(dialog);
+    dialog.querySelector('.github-cancel-btn').addEventListener('click', () => {
+      cleanup();
       resolve(null);
     });
     
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const url = input.value.trim();
-        document.body.removeChild(dialog);
+        cleanup();
         resolve(url || null);
+      }
+      if (e.key === 'Escape') {
+        cleanup();
+        resolve(null);
+      }
+    });
+    
+    // 点击背景关闭
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        cleanup();
+        resolve(null);
       }
     });
   });
