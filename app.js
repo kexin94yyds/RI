@@ -2446,9 +2446,19 @@ async function exportAllModes() {
 // 导出并同步到 GitHub
 async function exportAndSyncToGitHub() {
   try {
+    // 0. 先询问是否需要清理
+    const stats = await getDbStats();
+    const shouldCleanup = confirm(
+      `当前数据库共 ${stats.wordsCount} 条记录\n\n` +
+      `是否在同步后清理 30 天前的旧数据？\n` +
+      `（会先备份到 GitHub，再清理本地）\n\n` +
+      `点击"确定"：备份 + 清理\n` +
+      `点击"取消"：仅备份不清理`
+    );
+    
     showStatus('正在同步到 GitHub...');
     
-    // 1. 先导出到文件系统
+    // 1. 先导出到文件系统（备份）
     await initFileStorage();
     const notesDir = await getNotesDir();
     const allModes = await getAllModes();
@@ -2458,20 +2468,19 @@ async function exportAndSyncToGitHub() {
       return;
     }
     
-    const count = await exportAllDataToFiles(allModes, getWordsByMode);
-    showStatus(`已导出 ${count} 条笔记，正在同步...`);
+    // 强制导出所有数据作为备份
+    const count = await exportAllDataToFiles(allModes, getWordsByMode, true);
+    showStatus(`已备份 ${count} 条笔记，正在推送...`);
     
     // 2. 同步到 GitHub
     let syncSuccess = false;
-    const result = await syncToGitHub(`Auto-sync: ${count} notes exported`);
+    const result = await syncToGitHub(`Backup: ${count} notes`);
     
     if (result.needsRemote) {
-      // 需要设置远程仓库
       const repoUrl = await showGitHubSetupDialog();
       if (repoUrl) {
         await setRemoteRepo(repoUrl);
-        // 重试同步
-        const retryResult = await syncToGitHub(`Auto-sync: ${count} notes exported`);
+        const retryResult = await syncToGitHub(`Backup: ${count} notes`);
         if (retryResult.success) {
           syncSuccess = true;
           showStatus('✅ 已同步到 GitHub');
@@ -2488,25 +2497,15 @@ async function exportAndSyncToGitHub() {
       alert('同步失败: ' + result.message);
     }
     
-    // 3. 同步成功后询问是否清理旧数据
-    if (syncSuccess) {
-      const stats = await getDbStats();
-      const shouldCleanup = confirm(
-        `同步完成！\n\n` +
-        `已导出 ${count} 条笔记到 GitHub\n` +
-        `当前数据库共 ${stats.wordsCount} 条记录\n\n` +
-        `是否清理 30 天前的旧数据？\n` +
-        `（数据已备份到 GitHub，清理可提升性能）`
-      );
-      
-      if (shouldCleanup) {
-        showStatus('正在清理旧数据...');
-        const deleted = await cleanupOldData(30);
-        showStatus(`✅ 已清理 ${deleted} 条旧数据`);
-        alert(`清理完成！删除了 ${deleted} 条 30 天前的旧数据。`);
-        // 刷新界面
-        await loadModes();
-      }
+    // 3. 如果用户选择清理且同步成功
+    if (syncSuccess && shouldCleanup) {
+      showStatus('正在清理旧数据...');
+      const deleted = await cleanupOldData(30);
+      showStatus(`✅ 已清理 ${deleted} 条旧数据`);
+      alert(`同步并清理完成！\n\n备份了 ${count} 条笔记\n清理了 ${deleted} 条 30 天前的旧数据`);
+      await loadModes();
+    } else if (syncSuccess) {
+      alert(`同步完成！\n\n已备份 ${count} 条笔记到 GitHub`);
     }
   } catch (error) {
     console.error('同步到 GitHub 失败:', error);
