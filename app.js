@@ -2735,26 +2735,35 @@ async function exportToFileSystem() {
   try {
     showStatus('正在导出到文件系统...');
     
-    // 初始化文件存储
     await initFileStorage();
     const notesDir = await getNotesDir();
     
-    // 获取所有模式
     const allModes = await getAllModes();
     if (allModes.length === 0) {
-      alert('暂无模式可导出');
+      showStatus('暂无模式可导出');
       return;
     }
     
-    // 导出数据
-    const count = await exportAllDataToFiles(allModes, getWordsByMode);
+    // 获取总笔记数
+    const stats = await getDbStats();
     
-    showStatus(`✅ 已导出 ${count} 条笔记到: ${notesDir}`);
-    alert(`导出完成！\n\n位置: ${notesDir}\n共 ${count} 条笔记\n\n提示: 你可以将此文件夹添加到 Git 进行版本控制和备份。`);
+    // 强制全量导出（确保所有笔记都被导出）
+    const count = await exportAllDataToFiles(allModes, getWordsByMode, true, (progress) => {
+      showStatus(`正在导出... ${progress}%`);
+    });
+    
+    showStatus(`✅ 已导出到: ${notesDir}`);
+    
+    // 显示总数和新增数
+    const message = count > 0 
+      ? `导出完成！\n\n位置: ${notesDir}\n新增/更新 ${count} 条笔记\n数据库共 ${stats.wordsCount} 条\n\n提示: 你可以将此文件夹添加到 Git 进行版本控制和备份。`
+      : `导出完成！\n\n位置: ${notesDir}\n所有笔记已是最新\n数据库共 ${stats.wordsCount} 条`;
+    
+    // 使用自定义对话框
+    showConfirmDialog(message, null, null);
   } catch (error) {
     console.error('导出到文件系统失败:', error);
     showStatus('❌ 导出失败: ' + error.message);
-    alert('导出失败: ' + error.message);
   }
 }
 
