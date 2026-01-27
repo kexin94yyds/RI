@@ -816,6 +816,83 @@ ipcMain.handle('fs-write-file', async (event, filePath, content) => {
   }
 });
 
+// 读取文件
+ipcMain.handle('fs-read-file', async (event, filePath) => {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    return content;
+  } catch (error) {
+    console.error('读取文件失败:', error);
+    throw error;
+  }
+});
+
+// 读取目录
+ipcMain.handle('fs-read-dir', async (event, dirPath) => {
+  try {
+    const items = fs.readdirSync(dirPath, { withFileTypes: true });
+    return items.map(item => ({
+      name: item.name,
+      isDirectory: item.isDirectory(),
+      isFile: item.isFile()
+    }));
+  } catch (error) {
+    console.error('读取目录失败:', error);
+    throw error;
+  }
+});
+
+// 创建目录
+ipcMain.handle('fs-mkdir', async (event, dirPath) => {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+    console.log('目录已创建:', dirPath);
+    return true;
+  } catch (error) {
+    console.error('创建目录失败:', error);
+    throw error;
+  }
+});
+
+// 检查路径是否存在
+ipcMain.handle('fs-exists', async (event, filePath) => {
+  return fs.existsSync(filePath);
+});
+
+// 重命名文件/目录
+ipcMain.handle('fs-rename', async (event, oldPath, newPath) => {
+  try {
+    fs.renameSync(oldPath, newPath);
+    console.log('重命名成功:', oldPath, '->', newPath);
+    return true;
+  } catch (error) {
+    console.error('重命名失败:', error);
+    throw error;
+  }
+});
+
+// 删除文件/目录
+ipcMain.handle('fs-delete', async (event, filePath) => {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      fs.rmSync(filePath, { recursive: true });
+    } else {
+      fs.unlinkSync(filePath);
+    }
+    console.log('删除成功:', filePath);
+    return true;
+  } catch (error) {
+    console.error('删除失败:', error);
+    throw error;
+  }
+});
+
+// 获取用户主目录
+ipcMain.handle('fs-get-home-dir', async () => {
+  return require('os').homedir();
+});
+
 // 显示保存对话框
 ipcMain.handle('dialog-show-save', async (event, options) => {
   const { dialog } = require('electron');

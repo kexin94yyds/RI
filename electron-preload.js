@@ -24,7 +24,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 文件系统 API
   fs: {
     openPath: (path) => ipcRenderer.invoke('open-path', path),
-    writeFile: (filePath, content) => ipcRenderer.invoke('fs-write-file', filePath, content)
+    writeFile: (filePath, content) => ipcRenderer.invoke('fs-write-file', filePath, content),
+    readFile: (filePath) => ipcRenderer.invoke('fs-read-file', filePath),
+    readDir: (dirPath) => ipcRenderer.invoke('fs-read-dir', dirPath),
+    mkdir: (dirPath) => ipcRenderer.invoke('fs-mkdir', dirPath),
+    exists: (path) => ipcRenderer.invoke('fs-exists', path),
+    rename: (oldPath, newPath) => ipcRenderer.invoke('fs-rename', oldPath, newPath),
+    delete: (path) => ipcRenderer.invoke('fs-delete', path),
+    getHomeDir: () => ipcRenderer.invoke('fs-get-home-dir')
   },
   
   // 对话框 API
