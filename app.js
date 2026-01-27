@@ -13,7 +13,9 @@ import {
   clearAllWords as clearWords,
   updateModesOrder,
   getSetting,
-  setSetting
+  setSetting,
+  cleanupOldData,
+  getDbStats
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
 import { 
@@ -2460,6 +2462,7 @@ async function exportAndSyncToGitHub() {
     showStatus(`已导出 ${count} 条笔记，正在同步...`);
     
     // 2. 同步到 GitHub
+    let syncSuccess = false;
     const result = await syncToGitHub(`Auto-sync: ${count} notes exported`);
     
     if (result.needsRemote) {
@@ -2470,19 +2473,40 @@ async function exportAndSyncToGitHub() {
         // 重试同步
         const retryResult = await syncToGitHub(`Auto-sync: ${count} notes exported`);
         if (retryResult.success) {
+          syncSuccess = true;
           showStatus('✅ 已同步到 GitHub');
-          alert(`同步完成！\n\n${count} 条笔记已推送到 GitHub`);
         } else {
           showStatus('❌ 同步失败: ' + retryResult.message);
           alert('同步失败: ' + retryResult.message);
         }
       }
     } else if (result.success) {
+      syncSuccess = true;
       showStatus('✅ 已同步到 GitHub');
-      alert(`同步完成！\n\n${count} 条笔记已推送到 GitHub`);
     } else {
       showStatus('❌ 同步失败: ' + result.message);
       alert('同步失败: ' + result.message);
+    }
+    
+    // 3. 同步成功后询问是否清理旧数据
+    if (syncSuccess) {
+      const stats = await getDbStats();
+      const shouldCleanup = confirm(
+        `同步完成！\n\n` +
+        `已导出 ${count} 条笔记到 GitHub\n` +
+        `当前数据库共 ${stats.wordsCount} 条记录\n\n` +
+        `是否清理 30 天前的旧数据？\n` +
+        `（数据已备份到 GitHub，清理可提升性能）`
+      );
+      
+      if (shouldCleanup) {
+        showStatus('正在清理旧数据...');
+        const deleted = await cleanupOldData(30);
+        showStatus(`✅ 已清理 ${deleted} 条旧数据`);
+        alert(`清理完成！删除了 ${deleted} 条 30 天前的旧数据。`);
+        // 刷新界面
+        await loadModes();
+      }
     }
   } catch (error) {
     console.error('同步到 GitHub 失败:', error);

@@ -301,12 +301,31 @@ function convertToMarkdown(content) {
   return markdown.trim();
 }
 
-// 导出所有数据到文件系统
-export async function exportAllDataToFiles(modes, getNotesByMode) {
+// 获取上次导出时间
+async function getLastExportTime() {
+  const config = await getConfig();
+  return config.lastExportTime || 0;
+}
+
+// 保存导出时间
+async function saveLastExportTime(time) {
+  const config = await getConfig();
+  config.lastExportTime = time;
+  await saveConfig(config);
+}
+
+// 增量导出：只导出新增/修改的笔记
+export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = false) {
   try {
     await initFileStorage();
     
+    const lastExportTime = forceAll ? 0 : await getLastExportTime();
+    const currentTime = Date.now();
     let exportedCount = 0;
+    let skippedCount = 0;
+    
+    // 用于去重的 Set
+    const exportedFiles = new Set();
     
     for (const mode of modes) {
       // 创建模式文件夹
@@ -318,9 +337,25 @@ export async function exportAllDataToFiles(modes, getNotesByMode) {
       for (const note of notes) {
         if (note.content || note.html) {
           const content = note.html || note.content;
-          const date = new Date(note.createdAt || Date.now()).toISOString().split('T')[0];
+          const noteTime = note.createdAt || note.updatedAt || Date.now();
+          
+          // 增量导出：跳过上次导出之前的笔记
+          if (!forceAll && noteTime < lastExportTime) {
+            skippedCount++;
+            continue;
+          }
+          
+          const date = new Date(noteTime).toISOString().split('T')[0];
           const title = extractTitleFromContent(content);
           const fileName = `${date}-${title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50)}.md`;
+          
+          // 去重：相同文件名只导出一次
+          const fileKey = `${mode.name}/${fileName}`;
+          if (exportedFiles.has(fileKey)) {
+            skippedCount++;
+            continue;
+          }
+          exportedFiles.add(fileKey);
           
           await saveNoteToFile(mode.name, content, fileName);
           exportedCount++;
@@ -328,7 +363,10 @@ export async function exportAllDataToFiles(modes, getNotesByMode) {
       }
     }
     
-    console.log(`✓ 导出完成，共 ${exportedCount} 条笔记`);
+    // 保存本次导出时间
+    await saveLastExportTime(currentTime);
+    
+    console.log(`✓ 导出完成，新增 ${exportedCount} 条，跳过 ${skippedCount} 条`);
     return exportedCount;
   } catch (error) {
     console.error('导出数据失败:', error);

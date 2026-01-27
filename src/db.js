@@ -551,5 +551,59 @@ export async function setSetting(key, value) {
   });
 }
 
+// 清理旧数据：保留最近 N 天的数据
+export async function cleanupOldData(daysToKeep = 30) {
+  await ensureDb();
+  
+  const cutoffTime = Date.now() - (daysToKeep * 24 * 60 * 60 * 1000);
+  let deletedCount = 0;
+  
+  return runWithRetry(async () => {
+    const transaction = db.transaction([WORDS_STORE], 'readwrite');
+    const store = transaction.objectStore(WORDS_STORE);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.openCursor();
+      
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (cursor) {
+          const record = cursor.value;
+          const createdAt = record.createdAt || 0;
+          
+          if (createdAt < cutoffTime) {
+            cursor.delete();
+            deletedCount++;
+          }
+          cursor.continue();
+        } else {
+          console.log(`✓ 清理完成，删除 ${deletedCount} 条旧数据`);
+          resolve(deletedCount);
+        }
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
+
+// 获取数据库统计信息
+export async function getDbStats() {
+  await ensureDb();
+  
+  const modes = await getAllModes();
+  let totalWords = 0;
+  
+  for (const mode of modes) {
+    const words = await getWordsByMode(mode.id);
+    totalWords += words.length;
+  }
+  
+  return {
+    modesCount: modes.length,
+    wordsCount: totalWords
+  };
+}
+
 // 初始化数据库
 initDB().catch(console.error);
