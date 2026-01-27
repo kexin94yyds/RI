@@ -335,9 +335,18 @@ function setupEventListeners() {
   document.getElementById('export-btn').addEventListener('click', exportMarkdown);
   
   // 模式切换器
-  document.getElementById('mode-switcher-btn').addEventListener('click', (e) => {
+  const modeSwitcherBtn = document.getElementById('mode-switcher-btn');
+  modeSwitcherBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleModeDropdown();
+  });
+  
+  // Tab 键快速切换模式
+  modeSwitcherBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      switchToNextMode();
+    }
   });
   
   // 点击外部关闭下拉菜单
@@ -1910,4 +1919,13 @@ function switchToNextTab() {
   const currentIndex = tabs.findIndex(t => t.id === activeTabId);
   const nextIndex = (currentIndex + 1) % tabs.length;
   switchToTab(tabs[nextIndex].id);
+}
+
+// 切换到下一个模式（Tab 键）
+async function switchToNextMode() {
+  if (modes.length <= 1) return;
+  
+  const currentIndex = modes.findIndex(m => m.id === currentModeId);
+  const nextIndex = (currentIndex + 1) % modes.length;
+  await switchToMode(modes[nextIndex]);
 }
