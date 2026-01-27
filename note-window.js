@@ -1927,5 +1927,16 @@ async function switchToNextMode() {
   
   const currentIndex = modes.findIndex(m => m.id === currentModeId);
   const nextIndex = (currentIndex + 1) % modes.length;
+  
+  // 保持下拉菜单打开状态
+  const dropdown = document.getElementById('mode-dropdown');
+  const wasOpen = dropdown.style.display === 'block';
+  
   await switchToMode(modes[nextIndex]);
+  
+  // 如果之前是打开的，保持打开并更新选中状态
+  if (wasOpen) {
+    loadModesIntoDropdown();
+    dropdown.style.display = 'block';
+  }
 }
