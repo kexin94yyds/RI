@@ -31,7 +31,9 @@
       "!src-tauri/**/*",
       "!*.md",
       "!.git/**/*",
-      "!dist/**/*"
+      "!dist/**/*",
+      "!.cunzhi-knowledge/**/*",
+      "!.cunzhi-memory/**/*"
     ],
     "publish": {
       "provider": "github",
