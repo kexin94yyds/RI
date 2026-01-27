@@ -360,9 +360,11 @@ export async function exportAllDataToFiles(modes, getNotesByMode, forceAll = fal
               continue;
             }
             
-            const date = new Date(noteTime).toISOString().split('T')[0];
+            // 使用笔记 ID 作为文件名的一部分，确保唯一性
+            const noteId = note.id || Date.now();
             const title = extractTitleFromContent(content);
-            const fileName = `${date}-${title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50)}.md`;
+            const safeTitle = title.replace(/[\\/:*?"<>|]/g, '_').substring(0, 40);
+            const fileName = `${noteId}-${safeTitle}.md`;
             
             const fileKey = `${mode.name}/${fileName}`;
             if (exportedFiles.has(fileKey)) {

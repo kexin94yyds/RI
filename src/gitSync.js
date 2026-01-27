@@ -90,7 +90,7 @@ export async function commitChanges(message = null) {
   }
 }
 
-// 推送到远程仓库
+// 推送到远程仓库（合并模式，不强制覆盖）
 export async function pushToRemote() {
   try {
     const notesDir = await getNotesDir();
@@ -108,26 +108,41 @@ export async function pushToRemote() {
       branch = branchResult.trim() || 'main';
     } catch (e) {}
     
-    // 尝试正常推送
+    // 1. 先 fetch 远程更新
+    try {
+      await execGitCommand('git fetch origin', notesDir);
+      console.log('✓ 已获取远程更新');
+    } catch (e) {
+      console.log('fetch 失败，继续尝试推送');
+    }
+    
+    // 2. 尝试 pull --rebase 合并远程更新
+    try {
+      await execGitCommand(`git pull --rebase origin ${branch}`, notesDir);
+      console.log('✓ 已合并远程更新');
+    } catch (pullError) {
+      // 如果是首次同步（历史不相关），使用 --allow-unrelated-histories
+      try {
+        await execGitCommand(`git pull origin ${branch} --allow-unrelated-histories`, notesDir);
+        console.log('✓ 已合并远程更新（首次同步）');
+      } catch (e) {
+        // 如果还是失败，可能是空仓库，继续推送
+        console.log('pull 失败，可能是空仓库，继续推送');
+      }
+    }
+    
+    // 3. 推送到远程
     try {
       await execGitCommand(`git push origin ${branch}`, notesDir);
       console.log('✓ 已推送到 GitHub');
       return { success: true, message: '已推送到 GitHub' };
     } catch (pushError) {
-      // 如果推送失败，可能是远程有内容，尝试强制推送（首次同步）
-      console.log('正常推送失败，尝试强制推送...');
+      // 如果推送失败，尝试设置上游
       try {
-        await execGitCommand(`git push -f origin ${branch}`, notesDir);
-        console.log('✓ 已强制推送到 GitHub');
-        return { success: true, message: '已推送到 GitHub（首次同步）' };
-      } catch (forceError) {
-        // 如果还是失败，尝试设置上游并推送
-        try {
-          await execGitCommand(`git push -u origin ${branch} --force`, notesDir);
-          return { success: true, message: '已推送到 GitHub' };
-        } catch (e) {
-          throw pushError;
-        }
+        await execGitCommand(`git push -u origin ${branch}`, notesDir);
+        return { success: true, message: '已推送到 GitHub' };
+      } catch (e) {
+        throw pushError;
       }
     }
   } catch (error) {
