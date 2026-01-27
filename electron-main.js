@@ -893,6 +893,21 @@ ipcMain.handle('fs-get-home-dir', async () => {
   return require('os').homedir();
 });
 
+// 执行 Git 命令
+ipcMain.handle('git-exec', async (event, command, cwd) => {
+  const { exec } = require('child_process');
+  return new Promise((resolve, reject) => {
+    exec(command, { cwd, encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Git 命令失败:', command, error.message);
+        reject(new Error(stderr || error.message));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+});
+
 // 显示保存对话框
 ipcMain.handle('dialog-show-save', async (event, options) => {
   const { dialog } = require('electron');

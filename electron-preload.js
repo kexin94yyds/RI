@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     showSaveDialog: (options) => ipcRenderer.invoke('dialog-show-save', options)
   },
   
+  // Git API
+  git: {
+    exec: (command, cwd) => ipcRenderer.invoke('git-exec', command, cwd)
+  },
+  
   // 窗口控制 API
   window: {
     show: () => ipcRenderer.invoke('window-show'),

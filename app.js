@@ -21,6 +21,12 @@ import {
   getNotesDir, 
   exportAllDataToFiles 
 } from './src/fileStorage.js';
+import {
+  syncToGitHub,
+  setRemoteRepo,
+  getGitStatus,
+  initGitRepo
+} from './src/gitSync.js';
 
 // 全局变量
 let modes = [];
@@ -2413,9 +2419,111 @@ async function exportAllModes() {
   
   if (choice === 'files') {
     await exportToFileSystem();
+  } else if (choice === 'github') {
+    await exportAndSyncToGitHub();
   } else {
     await exportToZip();
   }
+}
+
+// 导出并同步到 GitHub
+async function exportAndSyncToGitHub() {
+  try {
+    showStatus('正在同步到 GitHub...');
+    
+    // 1. 先导出到文件系统
+    await initFileStorage();
+    const notesDir = await getNotesDir();
+    const allModes = await getAllModes();
+    
+    if (allModes.length === 0) {
+      alert('暂无模式可导出');
+      return;
+    }
+    
+    const count = await exportAllDataToFiles(allModes, getWordsByMode);
+    showStatus(`已导出 ${count} 条笔记，正在同步...`);
+    
+    // 2. 同步到 GitHub
+    const result = await syncToGitHub(`Auto-sync: ${count} notes exported`);
+    
+    if (result.needsRemote) {
+      // 需要设置远程仓库
+      const repoUrl = await showGitHubSetupDialog();
+      if (repoUrl) {
+        await setRemoteRepo(repoUrl);
+        // 重试同步
+        const retryResult = await syncToGitHub(`Auto-sync: ${count} notes exported`);
+        if (retryResult.success) {
+          showStatus('✅ 已同步到 GitHub');
+          alert(`同步完成！\n\n${count} 条笔记已推送到 GitHub`);
+        } else {
+          showStatus('❌ 同步失败: ' + retryResult.message);
+          alert('同步失败: ' + retryResult.message);
+        }
+      }
+    } else if (result.success) {
+      showStatus('✅ 已同步到 GitHub');
+      alert(`同步完成！\n\n${count} 条笔记已推送到 GitHub`);
+    } else {
+      showStatus('❌ 同步失败: ' + result.message);
+      alert('同步失败: ' + result.message);
+    }
+  } catch (error) {
+    console.error('同步到 GitHub 失败:', error);
+    showStatus('❌ 同步失败: ' + error.message);
+    alert('同步失败: ' + error.message);
+  }
+}
+
+// 显示 GitHub 设置对话框
+function showGitHubSetupDialog() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.className = 'export-dialog-overlay';
+    dialog.innerHTML = `
+      <div class="export-dialog">
+        <h3>设置 GitHub 仓库</h3>
+        <p style="font-size: 13px; color: #666; margin-bottom: 16px;">
+          请先在 GitHub 创建一个私有仓库，然后输入仓库地址：
+        </p>
+        <input type="text" id="github-repo-url" 
+          placeholder="https://github.com/用户名/仓库名.git"
+          style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 16px; box-sizing: border-box;">
+        <p style="font-size: 11px; color: #999; margin-bottom: 16px;">
+          提示：确保你已配置 Git SSH 密钥或 HTTPS 凭据
+        </p>
+        <div style="display: flex; gap: 8px;">
+          <button class="export-cancel" style="flex: 1;">取消</button>
+          <button id="github-confirm" style="flex: 1; padding: 10px; border: none; border-radius: 6px; background: #007AFF; color: white; cursor: pointer;">确定</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    const input = dialog.querySelector('#github-repo-url');
+    input.focus();
+    
+    dialog.querySelector('#github-confirm').addEventListener('click', () => {
+      const url = input.value.trim();
+      document.body.removeChild(dialog);
+      resolve(url || null);
+    });
+    
+    dialog.querySelector('.export-cancel').addEventListener('click', () => {
+      document.body.removeChild(dialog);
+      resolve(null);
+    });
+    
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const url = input.value.trim();
+        document.body.removeChild(dialog);
+        resolve(url || null);
+      }
+    });
+  });
 }
 
 // 导出到本地文件系统（~/Documents/RI-Notes/）
@@ -2455,11 +2563,17 @@ function showExportOptionsDialog() {
       <div class="export-dialog">
         <h3>选择导出方式</h3>
         <div class="export-options">
+          <button class="export-option" data-choice="github">
+            <span class="export-icon">🐙</span>
+            <span class="export-title">同步到 GitHub</span>
+            <span class="export-desc">自动提交并推送到远程仓库</span>
+            <span class="export-hint">推荐：免费云备份 + 版本控制</span>
+          </button>
           <button class="export-option" data-choice="files">
             <span class="export-icon">📁</span>
             <span class="export-title">导出到文件夹</span>
             <span class="export-desc">保存到 ~/Documents/RI-Notes/</span>
-            <span class="export-hint">推荐：可用 Git 备份</span>
+            <span class="export-hint">本地备份</span>
           </button>
           <button class="export-option" data-choice="zip">
             <span class="export-icon">📦</span>
