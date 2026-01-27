@@ -101,21 +101,38 @@ export async function pushToRemote() {
       return { success: false, message: '未配置远程仓库，请先设置 GitHub 仓库地址' };
     }
     
-    // 推送
-    await execGitCommand('git push origin main', notesDir);
-    
-    console.log('✓ 已推送到 GitHub');
-    return { success: true, message: '已推送到 GitHub' };
-  } catch (error) {
-    // 尝试 master 分支
+    // 获取当前分支名
+    let branch = 'main';
     try {
-      const notesDir = await getNotesDir();
-      await execGitCommand('git push origin master', notesDir);
+      const branchResult = await execGitCommand('git branch --show-current', notesDir);
+      branch = branchResult.trim() || 'main';
+    } catch (e) {}
+    
+    // 尝试正常推送
+    try {
+      await execGitCommand(`git push origin ${branch}`, notesDir);
+      console.log('✓ 已推送到 GitHub');
       return { success: true, message: '已推送到 GitHub' };
-    } catch (e) {
-      console.error('推送失败:', error);
-      return { success: false, message: error.message };
+    } catch (pushError) {
+      // 如果推送失败，可能是远程有内容，尝试强制推送（首次同步）
+      console.log('正常推送失败，尝试强制推送...');
+      try {
+        await execGitCommand(`git push -f origin ${branch}`, notesDir);
+        console.log('✓ 已强制推送到 GitHub');
+        return { success: true, message: '已推送到 GitHub（首次同步）' };
+      } catch (forceError) {
+        // 如果还是失败，尝试设置上游并推送
+        try {
+          await execGitCommand(`git push -u origin ${branch} --force`, notesDir);
+          return { success: true, message: '已推送到 GitHub' };
+        } catch (e) {
+          throw pushError;
+        }
+      }
     }
+  } catch (error) {
+    console.error('推送失败:', error);
+    return { success: false, message: error.message };
   }
 }
 
