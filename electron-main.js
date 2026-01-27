@@ -804,6 +804,30 @@ ipcMain.handle('open-path', async (event, filePath) => {
   }
 });
 
+// 写入文件
+ipcMain.handle('fs-write-file', async (event, filePath, content) => {
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    console.log('文件已保存:', filePath);
+    return true;
+  } catch (error) {
+    console.error('写入文件失败:', error);
+    throw error;
+  }
+});
+
+// 显示保存对话框
+ipcMain.handle('dialog-show-save', async (event, options) => {
+  const { dialog } = require('electron');
+  try {
+    const result = await dialog.showSaveDialog(options);
+    return result;
+  } catch (error) {
+    console.error('显示保存对话框失败:', error);
+    throw error;
+  }
+});
+
 // 打开外部链接（URL）
 ipcMain.handle('shell-open-external', async (event, url) => {
   try {

@@ -23,7 +23,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // 文件系统 API
   fs: {
-    openPath: (path) => ipcRenderer.invoke('open-path', path)
+    openPath: (path) => ipcRenderer.invoke('open-path', path),
+    writeFile: (filePath, content) => ipcRenderer.invoke('fs-write-file', filePath, content)
+  },
+  
+  // 对话框 API
+  dialog: {
+    showSaveDialog: (options) => ipcRenderer.invoke('dialog-show-save', options)
   },
   
   // 窗口控制 API

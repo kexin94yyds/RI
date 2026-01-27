@@ -550,7 +550,7 @@ async function closeWindow() {
 
 // 窗口始终置顶，不需要切换功能
 
-// 导出 Markdown - 直接复制到剪贴板
+// 导出 Markdown - 保存到文件并显示位置
 async function exportMarkdown() {
   try {
     // 先保存当前内容
@@ -565,18 +565,48 @@ async function exportMarkdown() {
     // 转换为 Markdown 格式
     const markdown = convertHtmlToMarkdown(editorContent);
     
-    // 直接复制到剪贴板
-    await window.electronAPI.clipboard.writeText(markdown);
+    // 获取文件名（使用内容第一行或默认名称）
+    const firstLine = getFirstLineText(editorContent) || 'Untitled';
+    const safeFileName = firstLine.replace(/[\\/:*?"<>|]/g, '_').substring(0, 50);
+    const defaultFileName = `${safeFileName}.md`;
     
-    // 同步保存“图文合一”的笔记项（不再自动单独保存图片）
+    // 尝试使用 Electron 的保存对话框
+    if (window.electronAPI && window.electronAPI.dialog) {
+      const result = await window.electronAPI.dialog.showSaveDialog({
+        defaultPath: defaultFileName,
+        filters: [
+          { name: 'Markdown', extensions: ['md'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (!result.canceled && result.filePath) {
+        // 保存文件
+        await window.electronAPI.fs.writeFile(result.filePath, markdown);
+        showNotification(`✅ 已导出到: ${result.filePath}`);
+        console.log('笔记已导出到:', result.filePath);
+        
+        // 同时保存到笔记
+        await saveCombinedNoteEntry();
+        return;
+      }
+    }
+    
+    // 如果没有对话框 API，回退到复制到剪贴板
+    await window.electronAPI.clipboard.writeText(markdown);
     await saveCombinedNoteEntry();
-
-    // 显示成功通知
-    showNotification('✅ 已导出并保存图文到笔记！');
+    showNotification('✅ 已复制到剪贴板并保存到笔记！');
     console.log('笔记已导出到剪贴板');
   } catch (error) {
     console.error('导出失败:', error);
-    showNotification('❌ 导出失败: ' + error.message, false);
+    // 回退到剪贴板
+    try {
+      const markdown = convertHtmlToMarkdown(editorContent);
+      await window.electronAPI.clipboard.writeText(markdown);
+      showNotification('✅ 已复制到剪贴板（文件保存失败）');
+    } catch (e) {
+      showNotification('❌ 导出失败: ' + error.message, false);
+    }
   }
 }
 
