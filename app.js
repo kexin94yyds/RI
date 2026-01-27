@@ -418,7 +418,12 @@ function setupEventListeners() {
 
   // 导出导入按钮
   document.getElementById("export-btn")?.addEventListener("click", exportTXT);
-  document.getElementById("export-all-btn")?.addEventListener("click", exportAllModes);
+  const exportAllBtn = document.getElementById("export-all-btn");
+  console.log('export-all-btn element:', exportAllBtn);
+  if (exportAllBtn) {
+    exportAllBtn.addEventListener("click", exportAllModes);
+    console.log('export-all-btn event listener added');
+  }
   document.getElementById("import-btn")?.addEventListener("click", showImportDialog);
 
   // 置顶按钮
@@ -2395,8 +2400,19 @@ async function exportTXT() {
 
 // 全部导出：导出除历史记录外的所有模式为 Markdown 文件（打包为 ZIP）
 async function exportAllModes() {
+  console.log('exportAllModes called');
   // 获取所有模式
   const allModes = await getAllModes();
+  console.log('allModes:', allModes);
+  
+  // 调试：打印每个模式的数据
+  for (const mode of allModes) {
+    const words = await getWordsByMode(mode.id);
+    console.log(`模式 "${mode.name}" (id=${mode.id}):`, words.length, '条内容');
+    if (words.length > 0) {
+      console.log('  第一条内容:', words[0]);
+    }
+  }
   
   if (allModes.length === 0) {
     alert('暂无模式可导出');

@@ -272,6 +272,9 @@ async function switchToMode(mode) {
 // ==================== 事件监听设置 ====================
 
 function setupEventListeners() {
+  // 初始化状态栏
+  initStatusBar();
+  
   // 编辑器输入事件
   editor.addEventListener('input', handleEditorInput);
   
@@ -437,6 +440,12 @@ function handleEditorInput() {
   
   // 更新标题
   updateTitle();
+  
+  // 更新字数统计
+  updateWordCount();
+  
+  // 标记当前标签为脏
+  markCurrentTabDirty();
   
   // 自动保存到模式的 notes 字段（防抖）
   if (saveTimeout) clearTimeout(saveTimeout);
@@ -1295,10 +1304,12 @@ function showImageModal(src) {
 
 // 设置搜索相关的事件监听器
 function setupSearchListeners() {
-  // 全局快捷键监听 Cmd+F 或 Ctrl+F
+  // 全局快捷键监听
   document.addEventListener('keydown', (e) => {
-    // Cmd+F (Mac) 或 Ctrl+F (Windows/Linux)
-    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+    const isMod = e.metaKey || e.ctrlKey;
+    
+    // Cmd+F (Mac) 或 Ctrl+F (Windows/Linux) - 搜索
+    if (isMod && e.key === 'f') {
       e.preventDefault();
       // 切换搜索框：如果已打开就关闭，否则打开
       if (searchBox.classList.contains('active')) {
@@ -1306,6 +1317,29 @@ function setupSearchListeners() {
       } else {
         openSearchBox();
       }
+      return;
+    }
+    
+    // Cmd+N - 新建笔记（当前模式下）
+    if (isMod && e.key === 'n') {
+      e.preventDefault();
+      createNewNote();
+      return;
+    }
+    
+    // Cmd+W - 关闭当前标签/窗口
+    if (isMod && e.key === 'w') {
+      e.preventDefault();
+      closeCurrentTab();
+      return;
+    }
+    
+    // Cmd+1~6 - 标题级别 H1~H6
+    if (isMod && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+      e.preventDefault();
+      const level = parseInt(e.key);
+      applyHeading(level);
+      return;
     }
     
     // Esc 键关闭搜索框
@@ -1523,5 +1557,261 @@ function updateSearchCount() {
     searchCount.textContent = '0/0';
   } else {
     searchCount.textContent = `${currentMatchIndex + 1}/${searchMatches.length}`;
+  }
+}
+
+// ==================== 标签页和快捷键功能 ====================
+
+// 标签页状态
+let tabs = [];
+let activeTabId = null;
+let untitledCounter = 0;
+
+// 初始化状态栏
+function initStatusBar() {
+  // 新建标签按钮
+  const newTabBtn = document.getElementById('new-tab-btn');
+  if (newTabBtn) {
+    newTabBtn.addEventListener('click', createNewNote);
+  }
+  
+  // 模式切换按钮（暂时只显示，后续可扩展）
+  const modeBtn = document.getElementById('status-mode-btn');
+  if (modeBtn) {
+    modeBtn.addEventListener('click', () => {
+      showNotification('编辑模式切换功能开发中...');
+    });
+  }
+  
+  // 初始化第一个标签
+  if (tabs.length === 0) {
+    untitledCounter++;
+    const firstTab = {
+      id: generateTabId(),
+      title: `Untitled-${untitledCounter}`,
+      content: '',
+      isDirty: false
+    };
+    tabs.push(firstTab);
+    activeTabId = firstTab.id;
+  }
+  
+  // 渲染标签页
+  renderTabs();
+  
+  // 更新字数统计
+  updateWordCount();
+}
+
+// 生成唯一标签 ID
+function generateTabId() {
+  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// 创建新笔记（Cmd+N）
+function createNewNote() {
+  // 保存当前标签内容
+  saveCurrentTabContent();
+  
+  // 创建新标签
+  untitledCounter++;
+  const newTab = {
+    id: generateTabId(),
+    title: `Untitled-${untitledCounter}`,
+    content: '',
+    isDirty: false
+  };
+  
+  tabs.push(newTab);
+  activeTabId = newTab.id;
+  
+  // 清空编辑器
+  editor.innerHTML = '';
+  editorContent = '';
+  editor.setAttribute('data-placeholder', '在此输入内容或粘贴富文本...');
+  
+  // 更新 UI
+  renderTabs();
+  updateWordCount();
+  updateTitle();
+  
+  // 聚焦编辑器
+  editor.focus();
+  
+  showNotification(`✓ 新建笔记: ${newTab.title}`);
+}
+
+// 关闭当前标签（Cmd+W）
+function closeCurrentTab() {
+  if (tabs.length <= 1) {
+    // 只剩一个标签，关闭窗口
+    closeWindow();
+    return;
+  }
+  
+  // 保存当前标签内容
+  saveCurrentTabContent();
+  
+  // 找到当前标签索引
+  const currentIndex = tabs.findIndex(t => t.id === activeTabId);
+  
+  // 移除当前标签
+  tabs = tabs.filter(t => t.id !== activeTabId);
+  
+  // 切换到相邻标签
+  const newIndex = Math.min(currentIndex, tabs.length - 1);
+  activeTabId = tabs[newIndex].id;
+  
+  // 加载新活动标签的内容
+  loadTabContent(activeTabId);
+  
+  // 更新 UI
+  renderTabs();
+  updateWordCount();
+}
+
+// 保存当前标签内容
+function saveCurrentTabContent() {
+  const currentTab = tabs.find(t => t.id === activeTabId);
+  if (currentTab) {
+    currentTab.content = editor.innerHTML;
+    currentTab.isDirty = false;
+  }
+}
+
+// 加载标签内容
+function loadTabContent(tabId) {
+  const tab = tabs.find(t => t.id === tabId);
+  if (tab) {
+    editor.innerHTML = tab.content;
+    editorContent = tab.content;
+    if (!tab.content) {
+      editor.setAttribute('data-placeholder', '在此输入内容或粘贴富文本...');
+    } else {
+      editor.removeAttribute('data-placeholder');
+    }
+    updateTitle();
+  }
+}
+
+// 切换到指定标签
+function switchToTab(tabId) {
+  if (tabId === activeTabId) return;
+  
+  // 保存当前标签
+  saveCurrentTabContent();
+  
+  // 切换
+  activeTabId = tabId;
+  loadTabContent(tabId);
+  
+  // 更新 UI
+  renderTabs();
+  updateWordCount();
+}
+
+// 渲染标签页
+function renderTabs() {
+  const tabsContainer = document.getElementById('status-tabs');
+  if (!tabsContainer) return;
+  
+  tabsContainer.innerHTML = '';
+  
+  tabs.forEach(tab => {
+    const tabEl = document.createElement('div');
+    tabEl.className = `tab-pill${tab.id === activeTabId ? ' active' : ''}`;
+    tabEl.dataset.tabId = tab.id;
+    
+    // 标题
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'tab-title';
+    titleSpan.textContent = tab.title;
+    tabEl.appendChild(titleSpan);
+    
+    // 脏状态指示器
+    if (tab.isDirty) {
+      const dirtyDot = document.createElement('span');
+      dirtyDot.className = 'tab-dirty-dot';
+      tabEl.appendChild(dirtyDot);
+    }
+    
+    // 关闭按钮（多于一个标签时显示）
+    if (tabs.length > 1) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'tab-close';
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeTab(tab.id);
+      });
+      tabEl.appendChild(closeBtn);
+    }
+    
+    // 点击切换标签
+    tabEl.addEventListener('click', () => switchToTab(tab.id));
+    
+    tabsContainer.appendChild(tabEl);
+  });
+}
+
+// 关闭指定标签
+function closeTab(tabId) {
+  if (tabs.length <= 1) return;
+  
+  const tabIndex = tabs.findIndex(t => t.id === tabId);
+  tabs = tabs.filter(t => t.id !== tabId);
+  
+  // 如果关闭的是当前标签，切换到相邻标签
+  if (tabId === activeTabId) {
+    const newIndex = Math.min(tabIndex, tabs.length - 1);
+    activeTabId = tabs[newIndex].id;
+    loadTabContent(activeTabId);
+  }
+  
+  renderTabs();
+  updateWordCount();
+}
+
+// 应用标题级别（Cmd+1~6）
+function applyHeading(level) {
+  const selection = window.getSelection();
+  if (!selection.rangeCount) return;
+  
+  // 使用 execCommand 应用格式
+  document.execCommand('formatBlock', false, `h${level}`);
+  
+  // 触发内容更新
+  handleEditorInput();
+  
+  showNotification(`✓ 已应用 H${level} 标题`);
+}
+
+// 更新字数统计
+function updateWordCount() {
+  const wordCountEl = document.getElementById('word-count');
+  const charCountEl = document.getElementById('char-count');
+  
+  if (!wordCountEl || !charCountEl) return;
+  
+  const text = editor.innerText || editor.textContent || '';
+  
+  // 字符数（不含空格）
+  const charCount = text.replace(/\s/g, '').length;
+  
+  // 字数（中文按字符计，英文按单词计）
+  const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+  const wordCount = chineseChars + englishWords;
+  
+  wordCountEl.textContent = `${wordCount} 字`;
+  charCountEl.textContent = `${charCount} 字符`;
+}
+
+// 标记当前标签为脏
+function markCurrentTabDirty() {
+  const currentTab = tabs.find(t => t.id === activeTabId);
+  if (currentTab && !currentTab.isDirty) {
+    currentTab.isDirty = true;
+    renderTabs();
   }
 }
