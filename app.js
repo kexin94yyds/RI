@@ -16,6 +16,11 @@ import {
   setSetting
 } from './src/db.js';
 import { autoCheckAndMigrate } from './src/migrate.js';
+import { 
+  initFileStorage, 
+  getNotesDir, 
+  exportAllDataToFiles 
+} from './src/fileStorage.js';
 
 // 全局变量
 let modes = [];
@@ -2398,21 +2403,192 @@ async function exportTXT() {
   showStatus(`已导出到 ${filename}`);
 }
 
-// 全部导出：导出除历史记录外的所有模式为 Markdown 文件（打包为 ZIP）
+// 全部导出：显示导出选项对话框
 async function exportAllModes() {
   console.log('exportAllModes called');
+  
+  // 显示导出选项对话框
+  const choice = await showExportOptionsDialog();
+  if (!choice) return;
+  
+  if (choice === 'files') {
+    await exportToFileSystem();
+  } else {
+    await exportToZip();
+  }
+}
+
+// 导出到本地文件系统（~/Documents/RI-Notes/）
+async function exportToFileSystem() {
+  try {
+    showStatus('正在导出到文件系统...');
+    
+    // 初始化文件存储
+    await initFileStorage();
+    const notesDir = await getNotesDir();
+    
+    // 获取所有模式
+    const allModes = await getAllModes();
+    if (allModes.length === 0) {
+      alert('暂无模式可导出');
+      return;
+    }
+    
+    // 导出数据
+    const count = await exportAllDataToFiles(allModes, getWordsByMode);
+    
+    showStatus(`✅ 已导出 ${count} 条笔记到: ${notesDir}`);
+    alert(`导出完成！\n\n位置: ${notesDir}\n共 ${count} 条笔记\n\n提示: 你可以将此文件夹添加到 Git 进行版本控制和备份。`);
+  } catch (error) {
+    console.error('导出到文件系统失败:', error);
+    showStatus('❌ 导出失败: ' + error.message);
+    alert('导出失败: ' + error.message);
+  }
+}
+
+// 显示导出选项对话框
+function showExportOptionsDialog() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('div');
+    dialog.className = 'export-dialog-overlay';
+    dialog.innerHTML = `
+      <div class="export-dialog">
+        <h3>选择导出方式</h3>
+        <div class="export-options">
+          <button class="export-option" data-choice="files">
+            <span class="export-icon">📁</span>
+            <span class="export-title">导出到文件夹</span>
+            <span class="export-desc">保存到 ~/Documents/RI-Notes/</span>
+            <span class="export-hint">推荐：可用 Git 备份</span>
+          </button>
+          <button class="export-option" data-choice="zip">
+            <span class="export-icon">📦</span>
+            <span class="export-title">导出为 ZIP</span>
+            <span class="export-desc">下载压缩包</span>
+            <span class="export-hint">适合分享或迁移</span>
+          </button>
+        </div>
+        <button class="export-cancel">取消</button>
+      </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+      .export-dialog-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      }
+      .export-dialog {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      }
+      .export-dialog h3 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        text-align: center;
+      }
+      .export-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .export-option {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 16px;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: left;
+      }
+      .export-option:hover {
+        border-color: #007AFF;
+        background: #f8f9ff;
+      }
+      .export-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+      }
+      .export-title {
+        font-weight: 600;
+        font-size: 14px;
+        color: #333;
+      }
+      .export-desc {
+        font-size: 12px;
+        color: #666;
+        margin-top: 4px;
+      }
+      .export-hint {
+        font-size: 11px;
+        color: #007AFF;
+        margin-top: 4px;
+      }
+      .export-cancel {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        background: #f0f0f0;
+        color: #666;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .export-cancel:hover {
+        background: #e0e0e0;
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(dialog);
+    
+    // 事件处理
+    dialog.querySelectorAll('.export-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const choice = btn.dataset.choice;
+        document.body.removeChild(dialog);
+        document.head.removeChild(style);
+        resolve(choice);
+      });
+    });
+    
+    dialog.querySelector('.export-cancel').addEventListener('click', () => {
+      document.body.removeChild(dialog);
+      document.head.removeChild(style);
+      resolve(null);
+    });
+    
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog);
+        document.head.removeChild(style);
+        resolve(null);
+      }
+    });
+  });
+}
+
+// 导出为 ZIP（原有功能）
+async function exportToZip() {
   // 获取所有模式
   const allModes = await getAllModes();
   console.log('allModes:', allModes);
-  
-  // 调试：打印每个模式的数据
-  for (const mode of allModes) {
-    const words = await getWordsByMode(mode.id);
-    console.log(`模式 "${mode.name}" (id=${mode.id}):`, words.length, '条内容');
-    if (words.length > 0) {
-      console.log('  第一条内容:', words[0]);
-    }
-  }
   
   if (allModes.length === 0) {
     alert('暂无模式可导出');
