@@ -619,22 +619,35 @@ export async function cleanupOldData(daysToKeep = 30) {
   });
 }
 
-// 获取数据库统计信息
+// 获取数据库统计信息（优化版：使用 count 而不是加载所有数据）
 export async function getDbStats() {
   await ensureDb();
   
-  const modes = await getAllModes();
-  let totalWords = 0;
-  
-  for (const mode of modes) {
-    const words = await getWordsByMode(mode.id);
-    totalWords += words.length;
-  }
-  
-  return {
-    modesCount: modes.length,
-    wordsCount: totalWords
-  };
+  return runWithRetry(() => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([MODES_STORE, WORDS_STORE], 'readonly');
+      
+      // 获取模式数量
+      const modesStore = transaction.objectStore(MODES_STORE);
+      const modesCountReq = modesStore.count();
+      
+      // 获取笔记数量
+      const wordsStore = transaction.objectStore(WORDS_STORE);
+      const wordsCountReq = wordsStore.count();
+      
+      let modesCount = 0;
+      let wordsCount = 0;
+      
+      modesCountReq.onsuccess = () => { modesCount = modesCountReq.result; };
+      wordsCountReq.onsuccess = () => { wordsCount = wordsCountReq.result; };
+      
+      transaction.oncomplete = () => {
+        resolve({ modesCount, wordsCount });
+      };
+      
+      transaction.onerror = () => reject(transaction.error);
+    });
+  });
 }
 
 // 初始化数据库
