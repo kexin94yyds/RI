@@ -2409,20 +2409,35 @@ async function exportTXT() {
   showStatus(`已导出到 ${filename}`);
 }
 
+// 导出状态标志，防止重复执行
+let isExporting = false;
+
 // 全部导出：显示导出选项对话框
 async function exportAllModes() {
   console.log('exportAllModes called');
+  
+  // 防止重复执行
+  if (isExporting) {
+    console.log('导出正在进行中，请稍候...');
+    showStatus('导出正在进行中，请稍候...');
+    return;
+  }
   
   // 显示导出选项对话框
   const choice = await showExportOptionsDialog();
   if (!choice) return;
   
-  if (choice === 'files') {
-    await exportToFileSystem();
-  } else if (choice === 'github') {
-    await exportAndSyncToGitHub();
-  } else {
-    await exportToZip();
+  isExporting = true;
+  try {
+    if (choice === 'files') {
+      await exportToFileSystem();
+    } else if (choice === 'github') {
+      await exportAndSyncToGitHub();
+    } else {
+      await exportToZip();
+    }
+  } finally {
+    isExporting = false;
   }
 }
 
