@@ -2307,15 +2307,13 @@ function showStatus(message) {
   floatStatus.textContent = message;
   floatStatus.style.opacity = '1';
   
-  // 如果是完成状态，3秒后隐藏
-  if (message.includes('✅') || message.includes('❌')) {
-    setTimeout(() => {
-      if (floatStatus) floatStatus.style.opacity = '0';
-    }, 3000);
-    setTimeout(() => {
-      statusEl.innerText = "";
-    }, 3000);
-  }
+  // 3秒后自动隐藏
+  setTimeout(() => {
+    if (floatStatus) floatStatus.style.opacity = '0';
+  }, 3000);
+  setTimeout(() => {
+    if (statusEl) statusEl.innerText = "";
+  }, 3000);
   try { console.log('[STATUS]', message); } catch (_) {}
 }
 
